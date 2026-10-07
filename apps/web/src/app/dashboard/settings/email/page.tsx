@@ -7,17 +7,17 @@ import { Card } from "@/components/ui/card";
 
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
-  email_from: "",
-  email_from_name: "",
-  email_to: "",
-  resend_api_key: "",
-  custom_domain: "",
-  cron_enabled: "false",
-  cron_frequency: "weekly",
-  cron_day: "monday",
-  cron_hour: "09",
-  cron_email_to: "",
-});
+    email_from: "",
+    email_from_name: "",
+    email_to: "",
+    resend_api_key: "",
+    custom_domain: "",
+    cron_enabled: "false",
+    cron_frequency: "weekly",
+    cron_day: "monday",
+    cron_hour: "09",
+    cron_email_to: "",
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -32,53 +32,27 @@ export default function EmailSettingsPage() {
       });
   }, []);
 
-  async function handleSaveEmail() {
-  setSaving(true);
-  setMessage(null);
-  try {
-    const emailSettings = {
-      email_from: settings.email_from,
-      email_from_name: settings.email_from_name,
-      email_to: settings.email_to,
-      resend_api_key: settings.resend_api_key,
-      custom_domain: settings.custom_domain,
-    };
-    const res = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(emailSettings),
-    });
-    if (res.ok) {
-      setMessage({ type: "success", text: "✅ Configuration email sauvegardée" });
+  async function handleSave() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (res.ok) {
+        setMessage({
+          type: "success",
+          text: "✅ Configuration email et cron sauvegardée",
+        });
+      } else {
+        setMessage({ type: "error", text: "❌ Erreur de sauvegarde" });
+      }
+    } finally {
+      setSaving(false);
     }
-  } finally {
-    setSaving(false);
   }
-}
-
-async function handleSaveCron() {
-  setSaving(true);
-  setMessage(null);
-  try {
-    const cronSettings = {
-      cron_enabled: settings.cron_enabled,
-      cron_frequency: settings.cron_frequency,
-      cron_day: settings.cron_day,
-      cron_hour: settings.cron_hour,
-      cron_email_to: settings.cron_email_to,
-    };
-    const res = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cronSettings),
-    });
-    if (res.ok) {
-      setMessage({ type: "success", text: "✅ Configuration cron sauvegardée" });
-    }
-  } finally {
-    setSaving(false);
-  }
-}
 
   async function handleTest() {
     setTesting(true);
@@ -89,7 +63,10 @@ async function handleSaveCron() {
       });
       const result = await res.json();
       if (res.ok) {
-        setMessage({ type: "success", text: "✅ Email de test envoyé à " + settings.email_to });
+        setMessage({
+          type: "success",
+          text: "✅ Email de test envoyé à " + settings.email_to,
+        });
       } else {
         setMessage({ type: "error", text: "❌ " + result.error });
       }
@@ -103,7 +80,7 @@ async function handleSaveCron() {
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex-1">
-          <Header title="Email Settings" />
+          <Header title="Settings" />
           <main className="p-8">Chargement...</main>
         </div>
       </div>
@@ -114,10 +91,17 @@ async function handleSaveCron() {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex-1">
-        <Header title="Email Settings" />
+        <Header title="Settings" />
         <main className="p-8 max-w-2xl">
           <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">Configuration Email (Resend)</h2>
+            <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
+
+            {/* ═══════════════════════════════════════════
+                SECTION EMAIL
+                ═══════════════════════════════════════════ */}
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+              📧 Configuration Email (Resend)
+            </h3>
             <p className="text-sm text-gray-500 mb-6">
               Configurez votre compte Resend pour envoyer des rapports par email.
               Obtenez une clé API gratuite sur{" "}
@@ -293,157 +277,164 @@ async function handleSaveCron() {
                   Votre clé est stockée de manière sécurisée dans Supabase.
                 </p>
               </div>
+            </div>
 
-              {message && (
-                <div
-                  className={`p-3 rounded ${
-                    message.type === "success"
-                      ? "bg-green-50 text-green-800"
-                      : "bg-red-50 text-red-800"
-                  }`}
-                >
-                  {message.text}
-                </div>
-              )}
+            {/* ═══════════════════════════════════════════
+                SECTION CRON
+                ═══════════════════════════════════════════ */}
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+              ⏰ Envoi automatique (Cron)
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Configurez l'envoi automatique de rapports par email.
+            </p>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={handleSaveEmail}
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? "Sauvegarde..." : "💾 Sauvegarder"}
-                </button>
-                <button
-                  onClick={handleTest}
-                  disabled={testing || !settings.email_to}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                >
-                  {testing ? "Envoi..." : "📧 Tester l'envoi"}
-                </button>
-                <a
-                  href="https://resend.com/api-keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                >
-                  🔗 Ouvrir Resend
-                </a>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="cron_enabled"
+                  checked={settings.cron_enabled === "true"}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      cron_enabled: e.target.checked ? "true" : "false",
+                    })
+                  }
+                  className="w-5 h-5"
+                />
+                <label htmlFor="cron_enabled" className="font-semibold">
+                  Activer l'envoi automatique
+                </label>
               </div>
+
+              {settings.cron_enabled === "true" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Fréquence
+                    </label>
+                    <select
+                      value={settings.cron_frequency}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          cron_frequency: e.target.value,
+                        })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="daily">Quotidien</option>
+                      <option value="weekly">Hebdomadaire</option>
+                      <option value="monthly">Mensuel</option>
+                    </select>
+                  </div>
+
+                  {settings.cron_frequency === "weekly" && (
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">
+                        Jour
+                      </label>
+                      <select
+                        value={settings.cron_day}
+                        onChange={(e) =>
+                          setSettings({ ...settings, cron_day: e.target.value })
+                        }
+                        className="w-full border rounded px-3 py-2"
+                      >
+                        <option value="monday">Lundi</option>
+                        <option value="tuesday">Mardi</option>
+                        <option value="wednesday">Mercredi</option>
+                        <option value="thursday">Jeudi</option>
+                        <option value="friday">Vendredi</option>
+                        <option value="saturday">Samedi</option>
+                        <option value="sunday">Dimanche</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Heure d'envoi
+                    </label>
+                    <select
+                      value={settings.cron_hour}
+                      onChange={(e) =>
+                        setSettings({ ...settings, cron_hour: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const h = String(i).padStart(2, "0");
+                        return (
+                          <option key={h} value={h}>
+                            {h}:00
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Email destinataire
+                    </label>
+                    <input
+                      type="email"
+                      value={settings.cron_email_to}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          cron_email_to: e.target.value,
+                        })
+                      }
+                      placeholder="comptable@example.com"
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Message de statut */}
+            {message && (
+              <div
+                className={`mt-6 p-3 rounded ${
+                  message.type === "success"
+                    ? "bg-green-50 text-green-800"
+                    : "bg-red-50 text-red-800"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
+
+            {/* Boutons */}
+            <div className="flex gap-3 pt-6">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Sauvegarde..." : "💾 Sauvegarder"}
+              </button>
+              <button
+                onClick={handleTest}
+                disabled={testing || !settings.email_to}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {testing ? "Envoi..." : "📧 Tester l'envoi"}
+              </button>
+              <a
+                href="https://resend.com/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                🔗 Ouvrir Resend
+              </a>
             </div>
           </Card>
-          <Card className="p-6 mt-6">
-  <h2 className="text-xl font-bold mb-4">⏰ Envoi automatique (Cron)</h2>
-  <p className="text-sm text-gray-500 mb-6">
-    Configurez l'envoi automatique de rapports par email.
-  </p>
-
-  <div className="space-y-4">
-    <div className="flex items-center gap-3">
-      <input
-        type="checkbox"
-        id="cron_enabled"
-        checked={settings.cron_enabled === "true"}
-        onChange={(e) =>
-          setSettings({
-            ...settings,
-            cron_enabled: e.target.checked ? "true" : "false",
-          })
-        }
-        className="w-5 h-5"
-      />
-      <label htmlFor="cron_enabled" className="font-semibold">
-        Activer l'envoi automatique
-      </label>
-    </div>
-
-    {settings.cron_enabled === "true" && (
-      <>
-        <div>
-          <label className="block text-sm font-semibold mb-1">Fréquence</label>
-          <select
-            value={settings.cron_frequency}
-            onChange={(e) =>
-              setSettings({ ...settings, cron_frequency: e.target.value })
-            }
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value="daily">Quotidien</option>
-            <option value="weekly">Hebdomadaire</option>
-            <option value="monthly">Mensuel</option>
-          </select>
-        </div>
-
-        {settings.cron_frequency === "weekly" && (
-          <div>
-            <label className="block text-sm font-semibold mb-1">Jour</label>
-            <select
-              value={settings.cron_day}
-              onChange={(e) =>
-                setSettings({ ...settings, cron_day: e.target.value })
-              }
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="monday">Lundi</option>
-              <option value="tuesday">Mardi</option>
-              <option value="wednesday">Mercredi</option>
-              <option value="thursday">Jeudi</option>
-              <option value="friday">Vendredi</option>
-              <option value="saturday">Samedi</option>
-              <option value="sunday">Dimanche</option>
-            </select>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-semibold mb-1">
-            Heure d'envoi
-          </label>
-          <select
-            value={settings.cron_hour}
-            onChange={(e) =>
-              setSettings({ ...settings, cron_hour: e.target.value })
-            }
-            className="w-full border rounded px-3 py-2"
-          >
-            {Array.from({ length: 24 }, (_, i) => {
-              const h = String(i).padStart(2, "0");
-              return (
-                <option key={h} value={h}>
-                  {h}:00
-                </option>
-              );
-            })}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-1">
-            Email destinataire
-          </label>
-          <input
-            type="email"
-            value={settings.cron_email_to}
-            onChange={(e) =>
-              setSettings({ ...settings, cron_email_to: e.target.value })
-            }
-            placeholder="comptable@example.com"
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
-      </>
-    )}
-  </div>
-  <div className="flex gap-3 pt-4">
-  <button
-    onClick={handleSaveCron}
-    disabled={saving}
-    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-  >
-    {saving ? "Sauvegarde..." : "💾 Sauvegarder le cron"}
-  </button>
-</div>
-</Card>
         </main>
       </div>
     </div>

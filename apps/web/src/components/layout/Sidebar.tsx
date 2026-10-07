@@ -18,7 +18,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/ask", label: "Ask AI" },
   { href: "/dashboard/audit", label: "Audit Log", adminOnly: true },
   { href: "/dashboard/settings/users", label: "Users", adminOnly: true },
-  { href: "/dashboard/settings/email", label: "Email Settings", adminOnly: true }
+  { href: "/dashboard/settings/email", label: "⚙️ Settings", adminOnly: true }
 ];
 
 export function Sidebar() {
@@ -49,7 +49,7 @@ export function Sidebar() {
         <div className="mt-6 pt-6 border-t">
           <p className="text-xs text-gray-500 mb-1">Signed in as</p>
           <p className="text-sm font-medium truncate">{profile.email}</p>
-          <Badge variant={isAdmin ? "error" : "info"} >
+          <Badge variant={isAdmin ? "error" : "info"}>
             {ROLE_LABELS[profile.role]}
           </Badge>
         </div>
