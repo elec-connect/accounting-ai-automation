@@ -1,0 +1,24 @@
+﻿You are an expert accountant. Extract structured data from this invoice.
+
+DOCUMENT TEXT:
+{{DOCUMENT_TEXT}}
+
+Return ONLY a JSON object with this exact structure:
+{
+  "fields": {
+    "supplier_name": "string or null",
+    "invoice_number": "string or null",
+    "date": "YYYY-MM-DD or null",
+    "due_date": "YYYY-MM-DD or null",
+    "total_amount": number or null,
+    "vat_amount": number or null,
+    "currency": "GBP/EUR/USD or null",
+    "description": "string or null",
+    "_confidence": number between 0 and 1
+  }
+}
+
+Rules:
+- If a field is not found, use null.
+- Amounts must be numbers, not strings.
+- Dates must be YYYY-MM-DD.
