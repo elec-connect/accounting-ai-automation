@@ -32,24 +32,53 @@ export default function EmailSettingsPage() {
       });
   }, []);
 
-  async function handleSave() {
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      if (res.ok) {
-        setMessage({ type: "success", text: "✅ Configuration sauvegardée" });
-      } else {
-        setMessage({ type: "error", text: "❌ Erreur de sauvegarde" });
-      }
-    } finally {
-      setSaving(false);
+  async function handleSaveEmail() {
+  setSaving(true);
+  setMessage(null);
+  try {
+    const emailSettings = {
+      email_from: settings.email_from,
+      email_from_name: settings.email_from_name,
+      email_to: settings.email_to,
+      resend_api_key: settings.resend_api_key,
+      custom_domain: settings.custom_domain,
+    };
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(emailSettings),
+    });
+    if (res.ok) {
+      setMessage({ type: "success", text: "✅ Configuration email sauvegardée" });
     }
+  } finally {
+    setSaving(false);
   }
+}
+
+async function handleSaveCron() {
+  setSaving(true);
+  setMessage(null);
+  try {
+    const cronSettings = {
+      cron_enabled: settings.cron_enabled,
+      cron_frequency: settings.cron_frequency,
+      cron_day: settings.cron_day,
+      cron_hour: settings.cron_hour,
+      cron_email_to: settings.cron_email_to,
+    };
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cronSettings),
+    });
+    if (res.ok) {
+      setMessage({ type: "success", text: "✅ Configuration cron sauvegardée" });
+    }
+  } finally {
+    setSaving(false);
+  }
+}
 
   async function handleTest() {
     setTesting(true);
@@ -279,7 +308,7 @@ export default function EmailSettingsPage() {
 
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={handleSave}
+                  onClick={handleSaveEmail}
                   disabled={saving}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                 >
@@ -407,7 +436,7 @@ export default function EmailSettingsPage() {
   </div>
   <div className="flex gap-3 pt-4">
   <button
-    onClick={handleSave}
+    onClick={handleSaveCron}
     disabled={saving}
     className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
   >
