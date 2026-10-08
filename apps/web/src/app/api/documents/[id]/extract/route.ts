@@ -2,6 +2,31 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
+// Polyfill DOMMatrix pour pdf-parse sur Vercel/Node.js
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // @ts-ignore
+  globalThis.DOMMatrix = class DOMMatrix {
+    // @ts-ignore
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    is2D = true;
+    isIdentity = true;
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    // @ts-ignore
+    constructor(init?: any) { if (init) Object.assign(this, init); }
+    // @ts-ignore
+    translate() { return new (globalThis.DOMMatrix as any)(); }
+    // @ts-ignore
+    scale() { return new (globalThis.DOMMatrix as any)(); }
+    // @ts-ignore
+    multiply() { return new (globalThis.DOMMatrix as any)(); }
+    // @ts-ignore
+    transformPoint(p: any) { return p; }
+  };
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
