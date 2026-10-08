@@ -3,7 +3,6 @@ const nextConfig = {
   serverExternalPackages: [
     'onnxruntime-node',
     'sharp',
-    '@xenova/transformers',
   ],
   experimental: {
     cpus: 1,
