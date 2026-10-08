@@ -8,7 +8,10 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const preExtractedText = formData.get('pre_extracted_text') as string | null;
+
     console.log('File received:', file?.name, file?.size);
+    console.log('Pre-extracted text length:', preExtractedText?.length || 0);
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -43,12 +46,13 @@ export async function POST(request: Request) {
       .from('documents')
       .insert({
         type: 'invoice',
-        status: 'received',
+        status: preExtractedText ? 'extracted' : 'received',
         original_filename: file.name,
         sender_email: 'manual-upload@system',
         storage_path: storagePath,
         source: 'manual_upload',
         content_hash: contentHash,
+        raw_text: preExtractedText || null,
         created_at: new Date().toISOString(),
       })
       .select()
