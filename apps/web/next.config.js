@@ -2,8 +2,9 @@
 const nextConfig = {
   serverExternalPackages: [
     'pdf-parse',
+    '@napi-rs/canvas',
     'onnxruntime-node',
-    '@xenova/transformers',
+    'sharp',
   ],
   experimental: {
     cpus: 1,

@@ -1,3 +1,4 @@
+import 'pdf-parse/worker';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
