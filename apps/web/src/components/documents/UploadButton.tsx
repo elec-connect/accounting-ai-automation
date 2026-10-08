@@ -13,18 +13,6 @@ export function UploadButton({ onUploaded }: { onUploaded: () => void }) {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Extraire le texte du PDF côté client AVANT l'upload
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-      try {
-        const { extractPdfText } = await import('@/lib/pdf-client');
-        const extractedText = await extractPdfText(file);
-        formData.append('pre_extracted_text', extractedText);
-        console.log('PDF extracted client-side, length:', extractedText.length);
-      } catch (err) {
-        console.error('Client PDF extraction failed:', err);
-      }
-    }
-
     try {
       const res = await fetch('/api/documents/upload', {
         method: 'POST',

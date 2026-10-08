@@ -86,11 +86,12 @@ export async function POST(
           excelText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' });
         }
         rawText = excelText;
-      } else if (fileName.endsWith('.pdf')) {
+            } else if (fileName.endsWith('.pdf')) {
+        console.log('Server-side PDF extraction not supported. Use client-side.');
         return NextResponse.json(
           {
             error:
-              'PDF extraction must be done client-side. Please re-upload the file.',
+              'Extraction PDF non disponible côté serveur. Utilisez le bouton "Extract with AI" depuis un navigateur.',
           },
           { status: 400 }
         );
