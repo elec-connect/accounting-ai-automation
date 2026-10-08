@@ -41,7 +41,11 @@ export async function middleware(request: NextRequest) {
   path === "/" ||
   path.startsWith("/login") ||
   path.startsWith("/signup") ||
-  path.startsWith("/api/cron");
+  path.startsWith("/api/cron") ||
+  path.startsWith("/api/documents") ||
+  path.startsWith("/api/settings") ||
+  path.startsWith("/api/search") ||
+  path.startsWith("/api/dashboard");
 
   // 1. Non authentifie sur page protegee -> /login
   if (!user && !isPublic) {

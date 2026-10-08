@@ -2,3 +2,5 @@ allowBuilds:
   tesseract.js: true
   esbuild: true
   sharp: true
+  '@xenova/transformers': true
+  protobufjs: true

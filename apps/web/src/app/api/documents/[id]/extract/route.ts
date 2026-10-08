@@ -9,6 +9,7 @@ export async function POST(
   console.log('=== EXTRACT START ===');
   try {
     const { id } = await params;
+    console.log('=== EXTRACT: ID ===', id);
     const supabase = await createClient();
 
     // 1. Récupérer le document
@@ -65,8 +66,8 @@ export async function POST(
       console.log('Running OCR on image...');
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('fra+eng', 1, {
-  workerPath: './node_modules/tesseract.js/src/worker-script/node/index.js',
-});
+        workerPath: './node_modules/tesseract.js/src/worker-script/node/index.js',
+      });
       const { data: ocrData } = await worker.recognize(buffer);
       rawText = ocrData.text;
       await worker.terminate();
@@ -79,15 +80,30 @@ export async function POST(
 
     console.log('Text extracted. Length:', rawText.length);
 
-    // 5. Analyser avec Ollama (compatible OpenAI)
-    console.log('Calling Ollama...');
-    const openai = new OpenAI({
-      baseURL: 'http://127.0.0.1:12345/v1',
-      apiKey: 'ollama',
-    });
+    // 5. Analyser avec l'IA (Groq prioritaire, Ollama en fallback)
+    const groqKey = process.env.GROQ_API_KEY;
+
+    let openai: OpenAI;
+    let model: string;
+
+    if (groqKey) {
+      console.log('Using Groq');
+      openai = new OpenAI({
+        baseURL: 'https://api.groq.com/openai/v1',
+        apiKey: groqKey,
+      });
+      model = 'openai/gpt-oss-120b';
+    } else {
+      console.log('Using Ollama (local fallback)');
+      openai = new OpenAI({
+        baseURL: 'http://127.0.0.1:12345/v1',
+        apiKey: 'ollama',
+      });
+      model = 'qwen2.5:3b';
+    }
 
     const completion = await openai.chat.completions.create({
-      model: 'qwen2.5:3b',
+      model,
       messages: [
         {
           role: 'system',
@@ -116,7 +132,7 @@ ${rawText.slice(0, 8000)}`,
       temperature: 0.1,
     });
 
-    console.log('Ollama response received');
+    console.log('AI response received');
     const extractedFields = JSON.parse(
       completion.choices[0].message.content || '{}'
     );
@@ -129,7 +145,7 @@ ${rawText.slice(0, 8000)}`,
         document_id: id,
         extracted_fields: extractedFields,
         confidence: 0.95,
-        model_used: 'qwen2.5:3b',
+        model_used: model,
         prompt_version: 'v1',
       })
       .select()
@@ -144,6 +160,24 @@ ${rawText.slice(0, 8000)}`,
       .from('documents')
       .update({ status: 'extracted', raw_text: rawText.slice(0, 50000) })
       .eq('id', id);
+
+    // 8. Générer l'embedding pour la recherche sémantique
+    try {
+      const embedUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/embed`;
+      await fetch(embedUrl, { method: 'POST' });
+      console.log('Embedding generated');
+    } catch (embedError) {
+      console.error('Embedding error (non-blocking):', embedError);
+    }
+
+    // 9. Générer le résumé
+    try {
+      const summaryUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/summarize`;
+      await fetch(summaryUrl, { method: 'POST' });
+      console.log('Summary generated');
+    } catch (summaryError) {
+      console.error('Summary error (non-blocking):', summaryError);
+    }
 
     console.log('=== EXTRACT SUCCESS ===');
     return NextResponse.json({ success: true, extraction, rawText });
