@@ -53,6 +53,10 @@ export async function POST(
     // 4. Extraire le texte selon le type de fichier
     if (fileName.endsWith('.pdf')) {
       console.log('Parsing PDF with unpdf...');
+      // Initialiser PDF.js avec ses polyfills AVANT d'extraire
+      const { getResolvedPDFJS } = await import('unpdf');
+      await getResolvedPDFJS();
+      // Maintenant extraire le texte
       const { extractText } = await import('unpdf');
       const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
       rawText = text;
@@ -185,16 +189,7 @@ ${rawText.slice(0, 8000)}`,
       .update({ status: 'extracted', raw_text: rawText.slice(0, 50000) })
       .eq('id', id);
 
-    // 8. Générer l'embedding pour la recherche sémantique
-    //try {
-      //const embedUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/embed`;
-      //await fetch(embedUrl, { method: 'POST' });
-     // console.log('Embedding generated');
-    //} catch (embedError) {
-     // console.error('Embedding error (non-blocking):', embedError);
-    //}
-
-    // 9. Générer le résumé
+    // 8. Générer le résumé
     try {
       const summaryUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/summarize`;
       await fetch(summaryUrl, { method: 'POST' });
