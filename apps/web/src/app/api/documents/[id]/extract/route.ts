@@ -52,14 +52,24 @@ export async function POST(
 
     // 4. Extraire le texte selon le type de fichier
     if (fileName.endsWith('.pdf')) {
-      console.log('Parsing PDF with unpdf...');
-      // Initialiser PDF.js avec ses polyfills AVANT d'extraire
-      const { getResolvedPDFJS } = await import('unpdf');
-      await getResolvedPDFJS();
-      // Maintenant extraire le texte
-      const { extractText } = await import('unpdf');
-      const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
-      rawText = text;
+      console.log('Parsing PDF with pdfjs-dist legacy...');
+      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      const pdfDoc = await pdfjs.getDocument({
+        data: new Uint8Array(buffer),
+      }).promise;
+
+      let fullText = '';
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n';
+      }
+
+      rawText = fullText;
+      await pdfDoc.cleanup();
     } else if (
       fileName.endsWith('.jpg') ||
       fileName.endsWith('.jpeg') ||
