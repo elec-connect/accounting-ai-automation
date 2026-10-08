@@ -186,13 +186,13 @@ ${rawText.slice(0, 8000)}`,
       .eq('id', id);
 
     // 8. Générer l'embedding pour la recherche sémantique
-    try {
-      const embedUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/embed`;
-      await fetch(embedUrl, { method: 'POST' });
-      console.log('Embedding generated');
-    } catch (embedError) {
-      console.error('Embedding error (non-blocking):', embedError);
-    }
+    //try {
+      //const embedUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/documents/${id}/embed`;
+      //await fetch(embedUrl, { method: 'POST' });
+     // console.log('Embedding generated');
+    //} catch (embedError) {
+     // console.error('Embedding error (non-blocking):', embedError);
+    //}
 
     // 9. Générer le résumé
     try {
