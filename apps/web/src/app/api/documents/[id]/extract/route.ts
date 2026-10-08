@@ -34,84 +34,77 @@ export async function POST(
       return NextResponse.json({ success: true, extraction: existing, cached: true });
     }
 
-    let rawText = '';
+    // 3. Télécharger le fichier depuis Storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(doc.storage_path);
 
-    // 3. Utiliser le texte pré-extrait côté client s'il existe
-    if (doc.raw_text && doc.raw_text.length > 0) {
-      console.log('Using pre-extracted text from client. Length:', doc.raw_text.length);
-      rawText = doc.raw_text;
-    } else {
-      // 4. Sinon, télécharger et extraire côté serveur
-      console.log('No pre-extracted text, downloading from storage...');
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from('documents')
-        .download(doc.storage_path);
-
-      if (downloadError || !fileData) {
-        return NextResponse.json(
-          { error: 'Failed to download file: ' + downloadError?.message },
-          { status: 500 }
-        );
-      }
-
-      const buffer = Buffer.from(await fileData.arrayBuffer());
-      const fileName = doc.original_filename.toLowerCase();
-
-      if (
-        fileName.endsWith('.jpg') ||
-        fileName.endsWith('.jpeg') ||
-        fileName.endsWith('.png')
-      ) {
-        console.log('Running OCR on image...');
-        const { createWorker } = await import('tesseract.js');
-        const worker = await createWorker('fra+eng', 1, {
-          workerPath: './node_modules/tesseract.js/src/worker-script/node/index.js',
-        });
-        const { data: ocrData } = await worker.recognize(buffer);
-        rawText = ocrData.text;
-        await worker.terminate();
-      } else if (fileName.endsWith('.docx')) {
-        console.log('Parsing Word document...');
-        const mammoth = await import('mammoth');
-        const result = await mammoth.extractRawText({ buffer });
-        rawText = result.value;
-      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        console.log('Parsing Excel file...');
-        const XLSX = await import('xlsx');
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        let excelText = '';
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          excelText += `\n=== Feuille: ${sheetName} ===\n`;
-          excelText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' });
-        }
-        rawText = excelText;
-            } else if (fileName.endsWith('.pdf')) {
-        console.log('Server-side PDF extraction not supported. Use client-side.');
-        return NextResponse.json(
-          {
-            error:
-              'Extraction PDF non disponible côté serveur. Utilisez le bouton "Extract with AI" depuis un navigateur.',
-          },
-          { status: 400 }
-        );
-      } else {
-        return NextResponse.json(
-          { error: 'Unsupported file type.' },
-          { status: 400 }
-        );
-      }
-
-      // Sauvegarder le texte extrait
-      await supabase
-        .from('documents')
-        .update({ raw_text: rawText.slice(0, 50000) })
-        .eq('id', id);
+    if (downloadError || !fileData) {
+      return NextResponse.json(
+        { error: 'Failed to download file: ' + downloadError?.message },
+        { status: 500 }
+      );
     }
 
-    console.log('Text ready. Length:', rawText.length);
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const fileName = doc.original_filename.toLowerCase();
+    let rawText = '';
 
-    // 5. Analyser avec l'IA
+    // 4. Extraire le texte selon le type de fichier
+    if (fileName.endsWith('.pdf')) {
+      console.log('Parsing PDF with unpdf...');
+      const { extractText } = await import('unpdf');
+      const { text } = await extractText(new Uint8Array(buffer), {
+        mergePages: true,
+      });
+      rawText = text;
+    } else if (
+      fileName.endsWith('.jpg') ||
+      fileName.endsWith('.jpeg') ||
+      fileName.endsWith('.png')
+    ) {
+      console.log('Running OCR on image...');
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('fra+eng', 1, {
+        workerPath: './node_modules/tesseract.js/src/worker-script/node/index.js',
+      });
+      const { data: ocrData } = await worker.recognize(buffer);
+      rawText = ocrData.text;
+      await worker.terminate();
+    } else if (fileName.endsWith('.docx')) {
+      console.log('Parsing Word document...');
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+      rawText = result.value;
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      console.log('Parsing Excel file...');
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      let excelText = '';
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        excelText += `\n=== Feuille: ${sheetName} ===\n`;
+        excelText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' });
+      }
+      rawText = excelText;
+    } else if (fileName.endsWith('.doc')) {
+      return NextResponse.json(
+        { error: 'Format .doc non supporté. Convertissez en .docx.' },
+        { status: 400 }
+      );
+    } else {
+      return NextResponse.json(
+        {
+          error:
+            'Unsupported file type. Supported: PDF, JPG, PNG, DOCX, XLSX, XLS.',
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log('Text extracted. Length:', rawText.length);
+
+    // 5. Analyser avec l'IA (Groq prioritaire, Ollama en fallback)
     const groqKey = process.env.GROQ_API_KEY;
 
     let openai: OpenAI;

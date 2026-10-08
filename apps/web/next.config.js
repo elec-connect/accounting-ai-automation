@@ -1,10 +1,9 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: [
-     'onnxruntime-node',
-  'sharp',
-  'pdfjs-dist',   // ← Et cette ligne
-  ],
+    'onnxruntime-node',
+    'sharp',
+    ],
   experimental: {
     cpus: 1,
     workerThreads: false,
