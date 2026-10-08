@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 export async function POST(
   request: Request,
@@ -11,7 +12,16 @@ export async function POST(
     console.log('=== SUMMARIZE START ===');
     console.log('Document ID:', id);
 
-    const supabase = await createClient();
+    const supabase = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
 
     const { data: doc, error: docError } = await supabase
       .from('documents')
@@ -57,7 +67,7 @@ export async function POST(
     }
 
     console.log('Calling AI...');
-    const completion = await openai.chat.completions.create({
+        const completion = await openai.chat.completions.create({
       model,
       messages: [
         {
@@ -73,8 +83,12 @@ ${doc.raw_text.slice(0, 3000)}`,
         },
       ],
       temperature: 0.3,
-      max_tokens: 100,
+      max_tokens: 200,
+      // @ts-ignore
+      reasoning_effort: 'low',
     });
+
+    console.log('Full response:', JSON.stringify(completion.choices[0].message));
 
     const summary = completion.choices[0].message.content?.trim() || '';
     console.log('Summary generated:', summary);

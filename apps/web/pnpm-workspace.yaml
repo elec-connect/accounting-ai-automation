@@ -4,3 +4,5 @@ allowBuilds:
   sharp: true
   '@xenova/transformers': true
   protobufjs: true
+  mammoth: true
+  xlsx: true

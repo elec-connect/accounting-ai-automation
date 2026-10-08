@@ -40,7 +40,7 @@ export function UploadButton({ onUploaded }: { onUploaded: () => void }) {
       {uploading ? 'Uploading...' : '+ Upload Document'}
       <input
         type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
+        accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.xls"
         onChange={handleFileChange}
         className="hidden"
         disabled={uploading}

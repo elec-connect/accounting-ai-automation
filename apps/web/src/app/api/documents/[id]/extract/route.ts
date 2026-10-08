@@ -71,9 +71,33 @@ export async function POST(
       const { data: ocrData } = await worker.recognize(buffer);
       rawText = ocrData.text;
       await worker.terminate();
+    } else if (fileName.endsWith('.docx')) {
+      console.log('Parsing Word document...');
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+      rawText = result.value;
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      console.log('Parsing Excel file...');
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      let excelText = '';
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        excelText += `\n=== Feuille: ${sheetName} ===\n`;
+        excelText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' });
+      }
+      rawText = excelText;
+    } else if (fileName.endsWith('.doc')) {
+      return NextResponse.json(
+        { error: 'Format .doc non supporté. Convertissez en .docx.' },
+        { status: 400 }
+      );
     } else {
       return NextResponse.json(
-        { error: 'Unsupported file type. Only PDF, JPG, and PNG are supported.' },
+        {
+          error:
+            'Unsupported file type. Supported: PDF, JPG, PNG, DOCX, XLSX, XLS.',
+        },
         { status: 400 }
       );
     }
@@ -130,6 +154,8 @@ ${rawText.slice(0, 8000)}`,
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
+      // @ts-ignore
+      reasoning_effort: 'low',
     });
 
     console.log('AI response received');
