@@ -1,4 +1,3 @@
-import 'pdf-parse/worker';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -78,12 +77,10 @@ export async function POST(
 
     // 4. Extraire le texte selon le type de fichier
     if (fileName.endsWith('.pdf')) {
-      console.log('Parsing PDF...');
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: buffer });
-      const pdfData = await parser.getText();
-      rawText = pdfData.text;
-      await parser.destroy();
+      console.log('Parsing PDF with unpdf...');
+  const { extractText } = await import('unpdf');
+  const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+  rawText = text;
     } else if (
       fileName.endsWith('.jpg') ||
       fileName.endsWith('.jpeg') ||
