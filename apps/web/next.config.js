@@ -1,10 +1,6 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: [
-    'onnxruntime-node',
-    'sharp',
-    '@xenova/transformers',
-  ],
+  serverExternalPackages: ['onnxruntime-node', 'sharp'],
   experimental: {
     cpus: 1,
     workerThreads: false,
