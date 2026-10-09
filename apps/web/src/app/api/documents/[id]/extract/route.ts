@@ -191,7 +191,7 @@ ${rawText.slice(0, 8000)}`,
     // 8. Générer le résumé
     try {
       const appUrl =
-  process.env.APP_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
   new URL(request.url).origin;
 
       const summaryUrl =
