@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.text();
 
-    // Récupérer le secret depuis la table settings (ou .env)
+    // Récupérer le secret depuis la table settings
     const supabase = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -30,15 +30,33 @@ export async function POST(request: NextRequest) {
       settingsData?.value || process.env.RESEND_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
+      console.error('Webhook secret not configured');
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 500 }
       );
     }
 
-    // Vérifier la signature
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // Récupérer la clé API Resend depuis settings ou env
+    const { data: apiKeyData } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'resend_api_key')
+      .maybeSingle();
 
+    const resendApiKey = apiKeyData?.value || process.env.RESEND_API_KEY;
+
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return NextResponse.json(
+        { error: 'RESEND_API_KEY not configured' },
+        { status: 500 }
+      );
+    }
+
+    const resend = new Resend(resendApiKey);
+
+    // Vérifier la signature
     try {
       resend.webhooks.verify({
         payload,
@@ -55,32 +73,60 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(payload);
+    console.log('Event type:', event.type);
 
     if (event.type !== 'email.received') {
+      console.log('Skipping non-received event');
       return NextResponse.json({ ok: true, skipped: true });
     }
 
     console.log('Email received from:', event.data.from);
+    console.log('Email ID:', event.data.email_id);
 
-    // Récupérer les pièces jointes
-    const { data: attachments } = await resend.emails.receiving.attachments.list({
-      emailId: event.data.email_id,
-    });
+    // ============================================================
+    // LOGS DE DEBUG — AJOUTÉS ICI
+    // ============================================================
+    console.log('=== ATTACHMENTS DEBUG ===');
+    console.log('Email ID:', event.data.email_id);
+    console.log('Attachments from payload:', JSON.stringify(event.data.attachments));
+    console.log('Number of attachments:', event.data.attachments?.length || 0);
+    console.log('Attempting to fetch attachment...');
+    // ============================================================
 
-    if (!attachments?.data?.length) {
-      console.log('No attachments found');
+    const attachments = event.data.attachments || [];
+
+    if (!attachments.length) {
+      console.log('No attachments in payload');
       return NextResponse.json({ ok: true, noAttachments: true });
     }
 
-    for (const attachment of attachments.data) {
-      const response = await fetch(attachment.download_url);
-      const buffer = Buffer.from(await response.arrayBuffer());
+    for (const attachment of attachments) {
+      try {
+        console.log('Processing attachment:', attachment.filename);
+        console.log('Attachment ID:', attachment.id);
 
-      await uploadAndExtract(
-        buffer,
-        attachment.filename ?? 'attachment',
-        event.data.from
-      );
+        const { data: attachmentData, error: attachmentError } =
+          await resend.emails.receiving.attachments.get({
+            emailId: event.data.email_id,
+            id: attachment.id,
+          });
+
+        console.log('Attachment fetch result:', JSON.stringify(attachmentData));
+        console.log('Attachment fetch error:', attachmentError?.message);
+
+        if (attachmentError || !attachmentData) {
+          console.error('Attachment fetch error:', attachmentError?.message);
+          continue;
+        }
+
+        const response = await fetch(attachmentData.download_url);
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        await uploadAndExtract(buffer, attachment.filename, event.data.from);
+        console.log('Attachment processed:', attachment.filename);
+      } catch (err) {
+        console.error('Attachment processing error:', err);
+      }
     }
 
     console.log('=== INBOUND EMAIL SUCCESS ===');
