@@ -32,6 +32,7 @@ export function DocumentList() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   async function handleSendEmail() {
     const email = prompt("Entrez l'adresse email du destinataire :");
@@ -84,6 +85,12 @@ export function DocumentList() {
   }
 }
 
+function handleRefresh() {
+  setRefreshing(true);
+  loadDocuments();
+  setTimeout(() => setRefreshing(false), 500);
+}
+
   const loadDocuments = useCallback(() => {
     const supabase = createClient();
     supabase
@@ -106,31 +113,39 @@ export function DocumentList() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">All Documents</h2>
         <div className="flex gap-2">
-          <a
-            href="/api/documents/report"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            📄 PDF
-          </a>
-          <a
-            href="/api/documents/report/excel"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
-          >
-            📊 Excel
-          </a>
-          <button
-            onClick={handleSendEmail}
-            disabled={sending}
-            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-          >
-            {sending ? 'Envoi...' : '📧 Email'}
-          </button>
-          <UploadButton onUploaded={loadDocuments} />
-        </div>
+  <a
+    href="/api/documents/report"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+  >
+    📄 PDF
+  </a>
+  <a
+    href="/api/documents/report/excel"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+  >
+    📊 Excel
+  </a>
+  <button
+    onClick={handleSendEmail}
+    disabled={sending}
+    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+  >
+    {sending ? 'Envoi...' : '📧 Email'}
+  </button>
+  <button
+    onClick={handleRefresh}
+    disabled={refreshing}
+    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+    title="Rafraîchir la liste"
+  >
+    {refreshing ? '⏳' : '🔄'} Rafraîchir
+  </button>
+  <UploadButton onUploaded={loadDocuments} />
+</div>
       </div>
 
       {loading && <p className="text-gray-500">Loading documents...</p>}
