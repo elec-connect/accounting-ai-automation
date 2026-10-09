@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
+import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
 
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
@@ -121,11 +122,29 @@ export default function EmailSettingsPage() {
             </div>
 
             {/* ═══════════════════════════════════════════
-                SECTION EMAIL
-                ═══════════════════════════════════════════ */}
-            <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-              📧 Configuration Email (Resend)
-            </h3>
+    SECTION VARIABLES D'ENVIRONNEMENT
+    ═══════════════════════════════════════════ */}
+<h3
+  id="env-status"
+  className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
+>
+  🔐 Variables d'environnement
+</h3>
+<p className="text-sm text-gray-500 mb-6">
+  État des variables d'environnement configurées sur Vercel.
+  Les variables critiques doivent être présentes pour que l'application fonctionne.
+</p>
+
+<EnvironmentStatus />
+
+<div className="border-b mt-8 mb-8"></div>
+
+{/* ═══════════════════════════════════════════
+    SECTION EMAIL
+    ═══════════════════════════════════════════ */}
+<h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+  📧 Configuration Email (Resend)
+</h3>
             <p className="text-sm text-gray-500 mb-6">
               Configurez votre compte Resend pour envoyer des rapports par email.
               Obtenez une clé API gratuite sur{" "}
