@@ -59,37 +59,31 @@ export function DocumentList() {
   }
 
   async function handleDelete(id: string, filename: string) {
-  const confirmed = confirm(
-    `⚠️ Supprimer définitivement « ${filename} » ?\n\n` +
-    `Cette action est irréversible.\n` +
-    `Le document, son extraction et son fichier seront supprimés.`
-  );
+    const confirmed = confirm(
+      `⚠️ Supprimer définitivement « ${filename} » ?\n\n` +
+      `Cette action est irréversible.\n` +
+      `Le document, son extraction et son fichier seront supprimés.`
+    );
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  try {
-    const res = await fetch(`/api/documents/${id}/delete`, {
-      method: 'DELETE',
-    });
+    try {
+      const res = await fetch(`/api/documents/${id}/delete`, {
+        method: 'DELETE',
+      });
 
-    const result = await res.json();
+      const result = await res.json();
 
-    if (!res.ok) {
-      alert('❌ Erreur : ' + result.error);
-    } else {
-      alert('✅ Document supprimé.');
-      loadDocuments();
+      if (!res.ok) {
+        alert('❌ Erreur : ' + result.error);
+      } else {
+        alert('✅ Document supprimé.');
+        loadDocuments();
+      }
+    } catch (err) {
+      alert('Erreur : ' + (err instanceof Error ? err.message : 'Inconnue'));
     }
-  } catch (err) {
-    alert('Erreur : ' + (err instanceof Error ? err.message : 'Inconnue'));
   }
-}
-
-function handleRefresh() {
-  setRefreshing(true);
-  loadDocuments();
-  setTimeout(() => setRefreshing(false), 500);
-}
 
   const loadDocuments = useCallback(() => {
     const supabase = createClient();
@@ -104,6 +98,12 @@ function handleRefresh() {
       });
   }, []);
 
+  function handleRefresh() {
+    setRefreshing(true);
+    loadDocuments();
+    setTimeout(() => setRefreshing(false), 500);
+  }
+
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
@@ -112,40 +112,40 @@ function handleRefresh() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">All Documents</h2>
-        <div className="flex gap-2">
-  <a
-    href="/api/documents/report"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-  >
-    📄 PDF
-  </a>
-  <a
-    href="/api/documents/report/excel"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
-  >
-    📊 Excel
-  </a>
-  <button
-    onClick={handleSendEmail}
-    disabled={sending}
-    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-  >
-    {sending ? 'Envoi...' : '📧 Email'}
-  </button>
-  <button
-    onClick={handleRefresh}
-    disabled={refreshing}
-    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
-    title="Rafraîchir la liste"
-  >
-    {refreshing ? '⏳' : '🔄'} Rafraîchir
-  </button>
-  <UploadButton onUploaded={loadDocuments} />
-</div>
+        <div className="flex gap-2 flex-wrap">
+          <a
+            href="/api/documents/report"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            📄 PDF
+          </a>
+          <a
+            href="/api/documents/report/excel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+          >
+            📊 Excel
+          </a>
+          <button
+            onClick={handleSendEmail}
+            disabled={sending}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+          >
+            {sending ? 'Envoi...' : '📧 Email'}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+            title="Rafraîchir la liste"
+          >
+            {refreshing ? '⏳' : '🔄'} Rafraîchir
+          </button>
+          <UploadButton onUploaded={loadDocuments} />
+        </div>
       </div>
 
       {loading && <p className="text-gray-500">Loading documents...</p>}
@@ -196,14 +196,14 @@ function handleRefresh() {
                     {new Date(doc.created_at).toLocaleString()}
                   </td>
                   <td className="p-3">
-  <button
-    onClick={() => handleDelete(doc.id, doc.original_filename)}
-    className="text-red-600 hover:text-red-800 hover:underline text-sm font-medium"
-    title="Supprimer définitivement"
-  >
-    🗑️ Supprimer
-  </button>
-</td>
+                    <button
+                      onClick={() => handleDelete(doc.id, doc.original_filename)}
+                      className="text-red-600 hover:text-red-800 hover:underline text-sm font-medium"
+                      title="Supprimer définitivement"
+                    >
+                      🗑️ Supprimer
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
