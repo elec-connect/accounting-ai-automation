@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variables d'environnement — Accounting AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid #334155;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 1rem;
+    }
+    .notice {
+      background: #1e293b;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      color: #fbbf24;
+      font-size: 0.95rem;
+    }
+    .quick-link {
+      display: inline-block;
+      background: #3b82f6;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      margin-bottom: 2rem;
+      transition: background 0.2s;
+    }
+    .quick-link:hover { background: #2563eb; }
+    h2 {
+      font-size: 1.35rem;
+      margin: 2.5rem 0 1rem;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .var-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      transition: border-color 0.2s;
+    }
+    .var-card:hover { border-color: #475569; }
+    .var-card h3 {
+      font-size: 1.05rem;
+      color: #60a5fa;
+      margin-bottom: 0.5rem;
+      font-family: "SF Mono", Monaco, monospace;
+    }
+    .var-card .role {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .var-card ol {
+      margin-left: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .var-card ol li {
+      margin-bottom: 0.4rem;
+      font-size: 0.92rem;
+    }
+    .var-card a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    .var-card a:hover { text-decoration: underline; }
+    .env-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    .env-prod { background: #dc2626; color: white; }
+    .env-preview { background: #f59e0b; color: #1e293b; }
+    .env-dev { background: #10b981; color: white; }
+    .warning {
+      background: #7f1d1d;
+      border-left: 4px solid #ef4444;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+      color: #fecaca;
+    }
+    .tip {
+      background: #1e3a8a;
+      border-left: 4px solid #3b82f6;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+      color: #bfdbfe;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 1.5rem 0;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+      font-size: 0.9rem;
+    }
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td { border-bottom: none; }
+    code {
+      background: #0f172a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 0.85rem;
+      color: #a78bfa;
+    }
+    .steps {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .steps ol {
+      margin-left: 1.25rem;
+    }
+    .steps ol li {
+      margin-bottom: 0.6rem;
+    }
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid #334155;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+    .back-btn {
+      display: inline-block;
+      color: #94a3b8;
+      text-decoration: none;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .back-btn:hover { color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/dashboard/settings/email" class="back-btn">← Retour aux paramètres</a>
+
+    <header>
+      <h1>🎛️ Variables d'environnement</h1>
+      <p class="subtitle">Guide de configuration Vercel — Accounting AI Automation</p>
+    </header>
+
+    <div class="notice">
+      ℹ️ <strong>Important</strong> — Ces variables ne se configurent <strong>pas</strong> dans la page Settings. Elles doivent être ajoutées dans le dashboard <strong>Vercel</strong>, onglet <strong>Settings → Environment Variables</strong>. Sans elles, certaines fonctionnalités (base de données, IA, emails) ne fonctionneront pas.
+    </div>
+
+    <a href="https://vercel.com/dashboard" target="_blank" class="quick-link">
+      🔗 Ouvrir les Environment Variables Vercel
+    </a>
+
+    <h2>📋 Variables obligatoires</h2>
+
+    <!-- SUPABASE URL -->
+    <div class="var-card">
+      <h3>NEXT_PUBLIC_SUPABASE_URL</h3>
+      <p class="role">🗄️ URL de votre projet Supabase (connexion à la base de données).</p>
+      <ol>
+        <li>Connectez-vous sur <a href="https://supabase.com/dashboard" target="_blank">supabase.com/dashboard</a></li>
+        <li>Sélectionnez votre projet</li>
+        <li>Allez dans <strong>Settings</strong> → <strong>API</strong></li>
+        <li>Copiez la valeur <strong>Project URL</strong> (format : <code>https://xxxxx.supabase.co</code>)</li>
+        <li>Sur Vercel → ajoutez la variable avec cette valeur</li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <span class="env-badge env-preview">Preview</span>
+      <span class="env-badge env-dev">Development</span>
+    </div>
+
+    <!-- SUPABASE ANON -->
+    <div class="var-card">
+      <h3>NEXT_PUBLIC_SUPABASE_ANON_KEY</h3>
+      <p class="role">🔑 Clé publique Supabase (utilisée côté client pour l'authentification).</p>
+      <ol>
+        <li>Sur <a href="https://supabase.com/dashboard" target="_blank">supabase.com/dashboard</a> → votre projet</li>
+        <li><strong>Settings</strong> → <strong>API</strong></li>
+        <li>Copiez la valeur <strong>anon public</strong> (commence par <code>eyJ...</code>)</li>
+        <li>Sur Vercel → ajoutez la variable</li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <span class="env-badge env-preview">Preview</span>
+      <span class="env-badge env-dev">Development</span>
+      <div class="tip">💡 Cette clé est <strong>publique</strong> (exposée au navigateur) — c'est normal, elle est protégée par les RLS Supabase.</div>
+    </div>
+
+    <!-- SERVICE ROLE -->
+    <div class="var-card">
+      <h3>SUPABASE_SERVICE_ROLE_KEY</h3>
+      <p class="role">🛡️ Clé administrateur Supabase (accès total, bypass RLS). Utilisée uniquement côté serveur (cron, webhook).</p>
+      <ol>
+        <li>Sur <a href="https://supabase.com/dashboard" target="_blank">supabase.com/dashboard</a> → votre projet</li>
+        <li><strong>Settings</strong> → <strong>API</strong></li>
+        <li>Sous <strong>Project API keys</strong>, cliquez sur <strong>Reveal</strong> à côté de <code>service_role</code></li>
+        <li>Copiez la clé (commence par <code>eyJ...</code>)</li>
+        <li>Sur Vercel → ajoutez la variable</li>
+      </ol>
+      <span class="env-badge env-prod">Production uniquement</span>
+      <div class="warning">⚠️ Cette clé donne un accès <strong>total</strong> à votre base. Ne la partagez jamais et ne la mettez jamais dans du code client.</div>
+    </div>
+
+    <!-- GROQ -->
+    <div class="var-card">
+      <h3>GROQ_API_KEY</h3>
+      <p class="role">🤖 Clé API Groq pour l'extraction et le résumé IA des documents.</p>
+      <ol>
+        <li>Créez un compte sur <a href="https://console.groq.com" target="_blank">console.groq.com</a></li>
+        <li>Allez dans <strong>API Keys</strong> → <strong>Create API Key</strong></li>
+        <li>Copiez la clé (commence par <code>gsk_...</code>)</li>
+        <li>Sur Vercel → ajoutez la variable</li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <span class="env-badge env-preview">Preview</span>
+      <div class="tip">💡 Le plan gratuit Groq est suffisant pour tester.</div>
+    </div>
+
+    <!-- RESEND -->
+    <div class="var-card">
+      <h3>RESEND_API_KEY</h3>
+      <p class="role">📧 Clé API Resend pour l'envoi d'emails (rapports, tests).</p>
+      <ol>
+        <li>Créez un compte sur <a href="https://resend.com" target="_blank">resend.com</a></li>
+        <li>Allez dans <strong>API Keys</strong> → <strong>Create API Key</strong></li>
+        <li>Donnez un nom (ex: <code>accounting-ai-prod</code>), choisissez <strong>Full access</strong></li>
+        <li>Copiez la clé (commence par <code>re_...</code>)</li>
+        <li>Sur Vercel → ajoutez la variable</li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <div class="tip">💡 Vous pouvez également saisir cette clé directement dans la page Settings (champ "Clé API Resend") — elle sera alors stockée dans Supabase.</div>
+    </div>
+
+    <!-- CRON SECRET -->
+    <div class="var-card">
+      <h3>CRON_SECRET</h3>
+      <p class="role">⏰ Secret utilisé par Vercel Cron pour authentifier les appels automatiques à <code>/api/cron/*</code>.</p>
+      <ol>
+        <li>Générez une chaîne aléatoire sécurisée (ex: via <a href="https://generate-secret.vercel.app/32" target="_blank">generate-secret.vercel.app</a>)</li>
+        <li>Sur Vercel → ajoutez la variable avec cette valeur</li>
+        <li>Vercel l'enverra automatiquement dans le header <code>Authorization: Bearer &lt;valeur&gt;</code></li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <span class="env-badge env-preview">Preview</span>
+      <div class="warning">⚠️ Ne communiquez cette valeur à personne.</div>
+    </div>
+
+    <h2>📋 Variables optionnelles</h2>
+
+    <!-- APP URL -->
+    <div class="var-card">
+      <h3>NEXT_PUBLIC_APP_URL</h3>
+      <p class="role">🌐 URL publique de votre application (liens dans les emails, redirections OAuth).</p>
+      <ol>
+        <li>Récupérez l'URL de votre déploiement Vercel (ex: <code>https://accounting-ai-automation.vercel.app</code>)</li>
+        <li>Sur Vercel → ajoutez la variable</li>
+      </ol>
+      <span class="env-badge env-prod">Production</span>
+      <span class="env-badge env-preview">Preview</span>
+      <span class="env-badge env-dev">Development</span>
+      <div class="tip">💡 Development : <code>http://localhost:3000</code></div>
+    </div>
+
+    <!-- BYPASS -->
+    <div class="var-card">
+      <h3>VERCEL_AUTOMATION_BYPASS_SECRET</h3>
+      <p class="role">🔓 Bypass de la protection Vercel Authentication pour les tests automatisés (CI, Playwright).</p>
+      <ol>
+        <li>Sur Vercel → <strong>Settings</strong> → <strong>Deployment Protection</strong></li>
+        <li>Activez <strong>Protection Bypass for Automation</strong></li>
+        <li>Copiez le secret généré</li>
+        <li>Ajoutez-le comme variable d'environnement</li>
+      </ol>
+      <span class="env-badge env-preview">Preview uniquement</span>
+      <div class="tip">💡 Si vous ne faites pas de tests automatisés, cette variable est inutile.</div>
+    </div>
+
+    <h2>🚀 Procédure générale d'ajout sur Vercel</h2>
+    <div class="steps">
+      <ol>
+        <li>Connectez-vous sur <a href="https://vercel.com/dashboard" target="_blank">vercel.com/dashboard</a></li>
+        <li>Sélectionnez votre projet <strong>accounting-ai-automation</strong></li>
+        <li>Allez dans l'onglet <strong>Settings</strong></li>
+        <li>Dans le menu de gauche, cliquez sur <strong>Environment Variables</strong></li>
+        <li>Cliquez sur <strong>Add New</strong></li>
+        <li>Remplissez :
+          <ul style="margin-left:1.25rem;margin-top:0.4rem;">
+            <li><strong>Key</strong> : le nom exact de la variable</li>
+            <li><strong>Value</strong> : la valeur copiée</li>
+            <li><strong>Environments</strong> : cochez Production / Preview / Development</li>
+          </ul>
+        </li>
+        <li>Cliquez sur <strong>Save</strong></li>
+        <li><strong>Redéployez</strong> votre application (Deployments → ⋯ → Redeploy)</li>
+      </ol>
+    </div>
+
+    <h2>📊 Tableau récapitulatif</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Où l'obtenir</th>
+          <th>Environnements</th>
+          <th>Obligatoire</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td>Supabase → Settings → API</td><td>Prod + Preview + Dev</td><td>✅</td></tr>
+        <tr><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td>Supabase → Settings → API</td><td>Prod + Preview + Dev</td><td>✅</td></tr>
+        <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Supabase → Settings → API</td><td>Prod uniquement</td><td>✅</td></tr>
+        <tr><td><code>GROQ_API_KEY</code></td><td>console.groq.com</td><td>Prod + Preview</td><td>✅</td></tr>
+        <tr><td><code>RESEND_API_KEY</code></td><td>resend.com/api-keys</td><td>Prod</td><td>✅</td></tr>
+        <tr><td><code>CRON_SECRET</code></td><td>Généré aléatoirement</td><td>Prod + Preview</td><td>✅</td></tr>
+        <tr><td><code>NEXT_PUBLIC_APP_URL</code></td><td>URL Vercel</td><td>Prod + Preview + Dev</td><td>⚪</td></tr>
+        <tr><td><code>VERCEL_AUTOMATION_BYPASS_SECRET</code></td><td>Vercel → Deployment Protection</td><td>Preview</td><td>⚪</td></tr>
+      </tbody>
+    </table>
+
+    <h2>⚠️ Bonnes pratiques</h2>
+    <div class="var-card">
+      <ul style="margin-left:1.25rem;">
+        <li>🔒 <strong>Ne partagez jamais</strong> les valeurs de <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>GROQ_API_KEY</code>, <code>RESEND_API_KEY</code> et <code>CRON_SECRET</code></li>
+        <li>🔄 <strong>Après ajout/modification</strong> d'une variable, vous devez <strong>redéployer</strong></li>
+        <li>🧪 <strong>Testez en Preview</strong> avant de passer en Production</li>
+        <li>📝 <strong>Conservez une copie</strong> des valeurs dans un gestionnaire de mots de passe</li>
+        <li>❌ <strong>N'ajoutez jamais</strong> ces variables dans un fichier <code>.env</code> commité sur Git</li>
+      </ul>
+    </div>
+
+    <footer>
+      Accounting AI Automation — Guide de configuration
+    </footer>
+  </div>
+</body>
+</html>

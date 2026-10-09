@@ -99,6 +99,28 @@ export default function EmailSettingsPage() {
             <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
 
             {/* ═══════════════════════════════════════════
+                BOUTON GUIDE VARIABLES D'ENVIRONNEMENT
+                ═══════════════════════════════════════════ */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-900">
+                  📘 Guide de configuration
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Consultez la documentation pour créer vos variables d'environnement sur Vercel.
+                </p>
+              </div>
+              <a
+                href="/docs/environment-variables.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap text-sm font-semibold"
+              >
+                Ouvrir le guide ↗
+              </a>
+            </div>
+
+            {/* ═══════════════════════════════════════════
                 SECTION EMAIL
                 ═══════════════════════════════════════════ */}
             <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
@@ -281,113 +303,113 @@ export default function EmailSettingsPage() {
               </div>
 
               {/* Section Webhook Resend */}
-<h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
-  📥 Réception d'emails (Webhook Resend)
-</h3>
-<p className="text-sm text-gray-500 mb-6">
-  Configurez la réception automatique des factures par email.
-  Les documents reçus seront traités automatiquement par l'IA.
-</p>
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+                📥 Réception d'emails (Webhook Resend)
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Configurez la réception automatique des factures par email.
+                Les documents reçus seront traités automatiquement par l'IA.
+              </p>
 
-<div className="space-y-4">
-  {/* Domaine inbound */}
-  <div>
-    <label className="block text-sm font-semibold mb-1">
-      Domaine de réception (Inbound)
-    </label>
-    <input
-      type="text"
-      value={settings.resend_inbound_domain}
-      onChange={(e) =>
-        setSettings({ ...settings, resend_inbound_domain: e.target.value })
-      }
-      placeholder="inbound.monentreprise.com"
-      className="w-full border rounded px-3 py-2"
-    />
-    <p className="text-xs text-gray-500 mt-1">
-      L'adresse email à laquelle vos clients enverront leurs factures.
-    </p>
-  </div>
+              <div className="space-y-4">
+                {/* Domaine inbound */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Domaine de réception (Inbound)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.resend_inbound_domain}
+                    onChange={(e) =>
+                      setSettings({ ...settings, resend_inbound_domain: e.target.value })
+                    }
+                    placeholder="inbound.monentreprise.com"
+                    className="w-full border rounded px-3 py-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    L'adresse email à laquelle vos clients enverront leurs factures.
+                  </p>
+                </div>
 
-  {/* Secret webhook */}
-  <div>
-    <label className="block text-sm font-semibold mb-1">
-      Secret du Webhook (whsec_...)
-    </label>
-    <input
-      type="password"
-      value={settings.resend_webhook_secret}
-      onChange={(e) =>
-        setSettings({ ...settings, resend_webhook_secret: e.target.value })
-      }
-      placeholder="whsec_..."
-      className="w-full border rounded px-3 py-2 font-mono text-sm"
-    />
-  </div>
+                {/* Secret webhook */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Secret du Webhook (whsec_...)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.resend_webhook_secret}
+                    onChange={(e) =>
+                      setSettings({ ...settings, resend_webhook_secret: e.target.value })
+                    }
+                    placeholder="whsec_..."
+                    className="w-full border rounded px-3 py-2 font-mono text-sm"
+                  />
+                </div>
 
-  {/* URL à copier dans Resend */}
-  <div>
-    <label className="block text-sm font-semibold mb-1">
-      URL du Webhook (à coller dans Resend)
-    </label>
-    <div className="flex gap-2">
-      <input
-        type="text"
-        readOnly
-        value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`}
-        className="w-full border rounded px-3 py-2 bg-gray-50 font-mono text-sm"
-      />
-      <button
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`
-          );
-          alert('✅ URL copiée !');
-        }}
-        className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 whitespace-nowrap"
-      >
-        📋 Copier
-      </button>
-    </div>
-  </div>
+                {/* URL à copier dans Resend */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    URL du Webhook (à coller dans Resend)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`}
+                      className="w-full border rounded px-3 py-2 bg-gray-50 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`
+                        );
+                        alert('✅ URL copiée !');
+                      }}
+                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 whitespace-nowrap"
+                    >
+                      📋 Copier
+                    </button>
+                  </div>
+                </div>
 
-  {/* Instructions */}
-  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-    <h3 className="font-bold text-blue-800 mb-2">
-      📋 Comment configurer le webhook sur Resend
-    </h3>
-    <ol className="list-decimal list-inside text-sm text-blue-900 space-y-2">
-      <li>
-        Connectez-vous sur{" "}
-        <a
-          href="https://resend.com/webhooks"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline font-semibold"
-        >
-          resend.com/webhooks
-        </a>
-      </li>
-      <li>
-        Cliquez sur <strong>Add Webhook</strong>.
-      </li>
-      <li>
-        Collez l'URL ci-dessus dans le champ <strong>Endpoint URL</strong>.
-      </li>
-      <li>
-        Sélectionnez l'événement <strong>email.received</strong>.
-      </li>
-      <li>
-        Copiez le <strong>Signing Secret</strong> (whsec_...) et collez-le
-        dans le champ "Secret du Webhook" ci-dessus.
-      </li>
-      <li>
-        Cliquez sur <strong>Save</strong>, puis sur <strong>💾 Sauvegarder</strong> ici.
-      </li>
-    </ol>
-  </div>
-</div>
+                {/* Instructions */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="font-bold text-blue-800 mb-2">
+                    📋 Comment configurer le webhook sur Resend
+                  </h3>
+                  <ol className="list-decimal list-inside text-sm text-blue-900 space-y-2">
+                    <li>
+                      Connectez-vous sur{" "}
+                      <a
+                        href="https://resend.com/webhooks"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-semibold"
+                      >
+                        resend.com/webhooks
+                      </a>
+                    </li>
+                    <li>
+                      Cliquez sur <strong>Add Webhook</strong>.
+                    </li>
+                    <li>
+                      Collez l'URL ci-dessus dans le champ <strong>Endpoint URL</strong>.
+                    </li>
+                    <li>
+                      Sélectionnez l'événement <strong>email.received</strong>.
+                    </li>
+                    <li>
+                      Copiez le <strong>Signing Secret</strong> (whsec_...) et collez-le
+                      dans le champ "Secret du Webhook" ci-dessus.
+                    </li>
+                    <li>
+                      Cliquez sur <strong>Save</strong>, puis sur <strong>💾 Sauvegarder</strong> ici.
+                    </li>
+                  </ol>
+                </div>
+              </div>
             </div>
 
             {/* ═══════════════════════════════════════════
