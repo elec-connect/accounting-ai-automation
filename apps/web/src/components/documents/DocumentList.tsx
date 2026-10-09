@@ -145,13 +145,13 @@ export function DocumentList() {
           <table className="w-full">
             <thead className="border-b-2">
               <tr>
-                <th className="text-left p-3">Actions</th>
                 <th className="text-left p-3">Filename</th>
                 <th className="text-left p-3">Type</th>
                 <th className="text-left p-3">Sender</th>
                 <th className="text-left p-3">Résumé</th>
                 <th className="text-left p-3">Status</th>
                 <th className="text-left p-3">Received</th>
+                <th className="text-left p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
