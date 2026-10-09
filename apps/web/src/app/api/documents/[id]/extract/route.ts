@@ -160,6 +160,20 @@ export async function POST(
       }
 
       rawText = excelText;
+    } else if (fileName.endsWith('.csv')) {
+      console.log('Parsing CSV file...');
+
+      const { parse } = await import('csv-parse/sync');
+
+      const records = parse(buffer.toString('utf-8'), {
+        columns: true,
+        skip_empty_lines: true,
+        bom: true,
+      });
+
+      rawText = records
+        .map((row) => Object.values(row as Record<string, unknown>).join(' | '))
+        .join('\n');
     } else if (fileName.endsWith('.doc')) {
       return NextResponse.json(
         {
@@ -172,7 +186,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'Format non pris en charge. Formats acceptés : PDF, JPG, JPEG, PNG, DOCX, XLSX et XLS.',
+            'Format non pris en charge. Formats acceptés : PDF, JPG, JPEG, PNG, DOCX, XLSX, XLS et CSV.',
         },
         { status: 400 }
       );
