@@ -57,6 +57,33 @@ export function DocumentList() {
     }
   }
 
+  async function handleDelete(id: string, filename: string) {
+  const confirmed = confirm(
+    `⚠️ Supprimer définitivement « ${filename} » ?\n\n` +
+    `Cette action est irréversible.\n` +
+    `Le document, son extraction et son fichier seront supprimés.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`/api/documents/${id}/delete`, {
+      method: 'DELETE',
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      alert('❌ Erreur : ' + result.error);
+    } else {
+      alert('✅ Document supprimé.');
+      loadDocuments();
+    }
+  } catch (err) {
+    alert('Erreur : ' + (err instanceof Error ? err.message : 'Inconnue'));
+  }
+}
+
   const loadDocuments = useCallback(() => {
     const supabase = createClient();
     supabase
@@ -118,6 +145,7 @@ export function DocumentList() {
           <table className="w-full">
             <thead className="border-b-2">
               <tr>
+                <th className="text-left p-3">Actions</th>
                 <th className="text-left p-3">Filename</th>
                 <th className="text-left p-3">Type</th>
                 <th className="text-left p-3">Sender</th>
@@ -152,6 +180,15 @@ export function DocumentList() {
                   <td className="p-3">
                     {new Date(doc.created_at).toLocaleString()}
                   </td>
+                  <td className="p-3">
+  <button
+    onClick={() => handleDelete(doc.id, doc.original_filename)}
+    className="text-red-600 hover:text-red-800 hover:underline text-sm font-medium"
+    title="Supprimer définitivement"
+  >
+    🗑️ Supprimer
+  </button>
+</td>
                 </tr>
               ))}
             </tbody>
