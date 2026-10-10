@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: Accounting AI Automation API
+  description: |
+    API d'automatisation comptable avec IA.
+    
+    Fonctionnalités :
+    - Upload et traitement de documents
+    - Extraction IA (score de confiance)
+    - Workflow d'exceptions
+    - Rapports et statistiques
+  version: 1.0.0
+  contact:
+    name: Elec-Connect
+    url: https://github.com/elec-connect/accounting-ai-automation
+
+servers:
+  - url: http://localhost:3000/api
+    description: Développement local
+  - url: https://accounting-ai-automation.vercel.app/api
+    description: Production
+
+tags:
+  - name: Documents
+    description: Gestion des documents
+  - name: Dashboard
+    description: Statistiques et KPI
+  - name: Settings
+    description: Configuration
+  - name: Cron
+    description: Tâches automatiques
+  - name: Audit
+    description: Journal d'audit
+  - name: Auth
+    description: Authentification (2FA)
+
+paths:
+  /documents/upload:
+    post:
+      tags: [Documents]
+      summary: Upload manuel d'un document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Document uploadé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  document: { type: object }
+                  pipelineMode: { type: string }
+                  extractionTriggered: { type: boolean }
+        '409':
+          description: Doublon détecté
+
+  /documents/{id}/extract:
+    post:
+      tags: [Documents]
+      summary: Extraction IA du contenu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Extraction réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  confidence: { type: number }
+                  status: { type: string }
+                  type: { type: string }
+
+  /documents/{id}/status:
+    post:
+      tags: [Documents]
+      summary: Change le statut
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, deliver, reset]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Statut changé
+
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Statistiques générales
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalDocuments: { type: integer }
+                  totalTtc: { type: number }
+                  topSuppliers: { type: array, items: { type: object } }
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Récupère les settings
+      responses:
+        '200':
+          description: Settings
+    post:
+      tags: [Settings]
+      summary: Met à jour les settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: { type: string }
+      responses:
+        '200':
+          description: Mis à jour
+
+  /cron/send-report:
+    get:
+      tags: [Cron]
+      summary: Envoie le rapport par email
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Rapport envoyé
+        '401':
+          description: Non autorisé
+
+  /audit:
+    get:
+      tags: [Audit]
+      summary: Récupère les logs d'audit (admin)
+      responses:
+        '200':
+          description: Logs
+        '403':
+          description: Interdit
+
+  /auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Initialise la 2FA
+      responses:
+        '200':
+          description: Setup démarré
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
