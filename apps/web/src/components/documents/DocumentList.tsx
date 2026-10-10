@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PipelineModeToggle } from "@/components/settings/PipelineModeToggle";
 import { ConfidenceThresholdInput } from "@/components/settings/ConfidenceThresholdInput";
 
@@ -31,12 +30,15 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const TYPE_LABELS: Record<string, { label: string; icon: string }> = {
-  invoice:       { label: "Facture",         icon: "🧾" },
-  quote:         { label: "Devis",           icon: "📝" },
+  invoice:       { label: "Facture",          icon: "🧾" },
+  quote:         { label: "Devis",            icon: "📝" },
   delivery_note: { label: "Bon de livraison", icon: "📦" },
-  receipt:       { label: "Reçu",            icon: "🧾" },
-  other:         { label: "Autre",           icon: "📄" },
+  receipt:       { label: "Reçu",             icon: "🧾" },
+  other:         { label: "Autre",            icon: "📄" },
 };
+
+const TWO_MINUTES_MS = 2 * 60 * 1000;
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 function getConfidenceBadge(score: number | null) {
   if (score == null) return null;
@@ -62,22 +64,68 @@ export function DocumentList() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
-  async function loadDocuments() {
-    setRefreshing(true);
+  // ═══════════════════════════════════════════════════════════
+  //  Chargement — le spinner est optionnel
+  // ═══════════════════════════════════════════════════════════
+  async function loadDocuments(options?: { showSpinner?: boolean }) {
+    const showSpinner = options?.showSpinner ?? false;
+
+    if (showSpinner) {
+      setRefreshing(true);
+    }
+
     const supabase = createClient();
     const { data } = await supabase
       .from("documents")
       .select("*")
       .order("created_at", { ascending: false });
+
     setDocuments(data || []);
     setLoading(false);
-    setRefreshing(false);
+
+    if (showSpinner) {
+      setRefreshing(false);
+    }
   }
 
+  // Chargement initial
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  //  Mise à jour du timestamp "now" toutes les 30s
+  //  → évite que les badges oscillent à chaque render
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  //  AUTO-REFRESH : uniquement si docs reçus < 2 min
+  //  Ne touche PAS à "refreshing" → pas de re-render du bouton
+  // ═══════════════════════════════════════════════════════════
+  useEffect(() => {
+    const hasRecentPending = documents.some((d) => {
+      if (d.status !== "received") return false;
+      const age = now - new Date(d.created_at).getTime();
+      return age < TWO_MINUTES_MS;
+    });
+
+    if (!hasRecentPending) return;
+
+    const interval = setInterval(() => {
+      loadDocuments(); // Pas de spinner
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [documents, now]);
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer ce document ?")) return;
@@ -127,7 +175,7 @@ export function DocumentList() {
     }
   }
 
-  // Filtrage combiné (statut + type)
+  // Filtrage
   const filteredDocuments = documents.filter((d) => {
     const statusOk = statusFilter === "all" || d.status === statusFilter;
     const typeOk = typeFilter === "all" || d.type === typeFilter;
@@ -153,23 +201,64 @@ export function DocumentList() {
     other: documents.filter((d) => d.type === "other").length,
   };
 
+  // Compteurs basés sur "now" (stable)
+  const recentPendingCount = documents.filter((d) => {
+    if (d.status !== "received") return false;
+    const age = now - new Date(d.created_at).getTime();
+    return age < TWO_MINUTES_MS;
+  }).length;
+
+  const stuckCount = documents.filter((d) => {
+    if (d.status !== "received") return false;
+    const age = now - new Date(d.created_at).getTime();
+    return age >= FIVE_MINUTES_MS;
+  }).length;
+
   if (loading) return <p className="text-gray-500">Chargement…</p>;
 
   return (
     <div>
-      {/* ═══════════════════════════════════════════════════════
-    MODE DE TRAITEMENT + SEUIL DE CONFIANCE
-    ═══════════════════════════════════════════════════════ */}
-<div className="mb-6 space-y-4">
+      {/* MODE DE TRAITEMENT + SEUIL DE CONFIANCE — 2 colonnes */}
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
   <PipelineModeToggle />
   <ConfidenceThresholdInput />
 </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          BARRE D'ACTIONS — Filtres + Boutons
-          ═══════════════════════════════════════════════════════ */}
+      {/* BANDEAU : Documents récents en cours */}
+      {recentPendingCount > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">🔄</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-blue-900">
+              {recentPendingCount} document{recentPendingCount > 1 ? "s" : ""}{" "}
+              en cours de traitement…
+            </p>
+            <p className="text-xs text-blue-700">
+              L'IA analyse les documents. La liste se met à jour automatiquement.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* BANDEAU : Documents bloqués */}
+      {stuckCount > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-900">
+              {stuckCount} document{stuckCount > 1 ? "s" : ""} bloqué
+              {stuckCount > 1 ? "s" : ""} en traitement
+            </p>
+            <p className="text-xs text-red-700">
+              Ces documents ne sont pas traités automatiquement. Cliquez sur 👁️
+              pour les traiter manuellement.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* BARRE D'ACTIONS */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        {/* Filtres par statut */}
         <div className="flex gap-2 flex-wrap">
           {[
             { value: "all",           label: "Tous",        icon: "📋" },
@@ -197,7 +286,6 @@ export function DocumentList() {
           ))}
         </div>
 
-        {/* Boutons à droite */}
         <div className="flex gap-2 flex-wrap">
           <label
             className={`px-3 py-1.5 text-sm rounded cursor-pointer whitespace-nowrap ${
@@ -205,7 +293,6 @@ export function DocumentList() {
                 ? "bg-gray-400 text-white cursor-wait"
                 : "bg-blue-600 text-white hover:bg-blue-700"
             }`}
-            title="Uploader un document manuellement"
           >
             {uploading ? "⏳ Upload…" : "📤 Upload"}
             <input
@@ -220,7 +307,6 @@ export function DocumentList() {
           <button
             onClick={() => window.open("/api/documents/report/excel", "_blank")}
             className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 whitespace-nowrap"
-            title="Exporter en Excel"
           >
             📊 Excel
           </button>
@@ -228,13 +314,13 @@ export function DocumentList() {
           <button
             onClick={() => window.open("/api/documents/export-pdf", "_blank")}
             className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 whitespace-nowrap"
-            title="Exporter en PDF"
           >
             📄 PDF
           </button>
 
+          {/* ⭐ Bouton Rafraîchir avec spinner OPTIONNEL */}
           <button
-            onClick={loadDocuments}
+            onClick={() => loadDocuments({ showSpinner: true })}
             disabled={refreshing}
             className="px-3 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap"
           >
@@ -243,9 +329,7 @@ export function DocumentList() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          FILTRE PAR TYPE
-          ═══════════════════════════════════════════════════════ */}
+      {/* FILTRE PAR TYPE */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <span className="text-sm text-gray-500 font-medium">Type :</span>
         {[
@@ -272,7 +356,7 @@ export function DocumentList() {
         ))}
       </div>
 
-      {/* Tableau */}
+      {/* TABLEAU */}
       <Card>
         <table className="w-full">
           <thead className="border-b-2">
@@ -329,21 +413,47 @@ export function DocumentList() {
                         <span className="text-xs text-gray-400">—</span>
                       )}
                     </td>
+
+                    {/* STATUT — utilise "now" stable */}
                     <td className="p-3">
-                      {(() => {
-                        const config = STATUS_LABELS[doc.status] || {
-                          label: doc.status,
-                          color: "bg-gray-100 text-gray-800",
-                        };
-                        return (
-                          <span
-                            className={`text-xs font-semibold px-2 py-1 rounded-full ${config.color}`}
-                          >
-                            {config.label}
-                          </span>
-                        );
-                      })()}
+                      {doc.status === "received" ? (
+                        (() => {
+                          const age = now - new Date(doc.created_at).getTime();
+                          const isStuck = age > FIVE_MINUTES_MS;
+
+                          if (isStuck) {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800">
+                                <span>⚠️</span>
+                                <span>Bloqué</span>
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                              <span>🔄</span>
+                              <span>Traitement…</span>
+                            </span>
+                          );
+                        })()
+                      ) : (
+                        (() => {
+                          const config = STATUS_LABELS[doc.status] || {
+                            label: doc.status,
+                            color: "bg-gray-100 text-gray-800",
+                          };
+                          return (
+                            <span
+                              className={`text-xs font-semibold px-2 py-1 rounded-full ${config.color}`}
+                            >
+                              {config.label}
+                            </span>
+                          );
+                        })()
+                      )}
                     </td>
+
                     <td className="p-3 text-xs text-gray-500">
                       {new Date(doc.created_at).toLocaleString("fr-FR")}
                     </td>
@@ -352,14 +462,12 @@ export function DocumentList() {
                         <Link
                           href={`/dashboard/documents/${doc.id}`}
                           className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                          title="Voir le détail"
                         >
                           👁️
                         </Link>
                         <button
                           onClick={() => handleDelete(doc.id)}
                           className="text-red-600 hover:text-red-800"
-                          title="Supprimer"
                         >
                           🗑️
                         </button>
