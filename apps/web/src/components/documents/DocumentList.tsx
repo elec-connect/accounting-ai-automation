@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PipelineModeToggle } from "@/components/settings/PipelineModeToggle";
+import { ConfidenceThresholdInput } from "@/components/settings/ConfidenceThresholdInput";
 
 type Document = {
   id: string;
@@ -157,11 +158,12 @@ export function DocumentList() {
   return (
     <div>
       {/* ═══════════════════════════════════════════════════════
-          MODE DE TRAITEMENT (Auto / Manuel)
-          ═══════════════════════════════════════════════════════ */}
-      <div className="mb-6">
-        <PipelineModeToggle />
-      </div>
+    MODE DE TRAITEMENT + SEUIL DE CONFIANCE
+    ═══════════════════════════════════════════════════════ */}
+<div className="mb-6 space-y-4">
+  <PipelineModeToggle />
+  <ConfidenceThresholdInput />
+</div>
 
       {/* ═══════════════════════════════════════════════════════
           BARRE D'ACTIONS — Filtres + Boutons

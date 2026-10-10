@@ -26,8 +26,7 @@ export default function EmailSettingsPage() {
     reminder_max_count: "3",
     reminder_hour: "8",
     cron_hour_utc: "7",
-    confidence_threshold: "90",
-    confidence_high_severity: "70",
+       
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,73 +146,7 @@ export default function EmailSettingsPage() {
 
             <div className="border-b mt-8 mb-8"></div>
 
-            {/* ═══════════════════════════════════════════
-                 SECTION SEUIL DE CONFIANCE
-                ═══════════════════════════════════════════ */}
-<h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-  🎯 Seuil de confiance IA
-</h3>
-<p className="text-sm text-gray-500 mb-6">
-  Détermine à partir de quel score l'IA approuve automatiquement un document.
-</p>
-
-<div className="space-y-4">
-  <div>
-    <label className="block text-sm font-semibold mb-1">
-      Seuil d'auto-approbation (%)
-    </label>
-    <input
-      type="number"
-      min="50"
-      max="100"
-      value={settings.confidence_threshold}
-      onChange={(e) =>
-        setSettings({ ...settings, confidence_threshold: e.target.value })
-      }
-      className="w-full border rounded px-3 py-2"
-    />
-    <p className="text-xs text-gray-500 mt-1">
-      Si le score ≥ cette valeur → auto-approuvé. Sinon → exception.
-    </p>
-  </div>
-
-  <div>
-  <label className="block text-sm font-semibold mb-1">
-    Heure d'envoi (UTC)
-  </label>
-  <select
-    value={settings.cron_hour}
-    onChange={(e) =>
-      setSettings({ ...settings, cron_hour: e.target.value })
-    }
-    className="w-full border rounded px-3 py-2"
-  >
-    {Array.from({ length: 24 }, (_, i) => {
-      const h = String(i).padStart(2, "0");
-      return (
-        <option key={h} value={h}>
-          {h}:00 UTC (±59 min)
-        </option>
-      );
-    })}
-  </select>
-  <p className="text-xs text-gray-500 mt-1">
-    ⚠️ Sur le plan Vercel Hobby, l'envoi peut arriver avec ±1h de décalage.
-    Pour une précision exacte, passez au plan Pro.
-  </p>
-</div>
-
-  <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-    📊 Exemple avec seuil à <strong>{settings.confidence_threshold}%</strong> :
-    <br />• Score 95% → ✅ Auto-approuvé
-    <br />• Score 85% → ⚠️ Exception (sévérité moyenne)
-    <br />• Score 50% → 🔴 Exception (sévérité haute)
-  </div>
-</div>
-
-<div className="border-b mt-8 mb-8"></div>
-
-            {/* ═══════════════════════════════════════════
+             {/* ═══════════════════════════════════════════
                 SECTION EMAIL
                 ═══════════════════════════════════════════ */}
             <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
