@@ -41,6 +41,7 @@ export function ExceptionList() {
 
   async function resolve(id: string, documentId: string) {
     const supabase = createClient();
+
     await supabase
       .from("exceptions")
       .update({
@@ -58,13 +59,15 @@ export function ExceptionList() {
   }
 
   if (loading) return <p className="text-gray-500">Loading...</p>;
-  if (exceptions.length === 0) return <p className="text-gray-500">No exceptions.</p>;
+  if (exceptions.length === 0)
+    return <p className="text-gray-500">No exceptions.</p>;
 
   return (
     <Card>
       {!canResolve && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-          You have <strong>read-only access</strong>. Only accountants and admins can resolve exceptions.
+          You have <strong>read-only access</strong>. Only accountants and
+          admins can resolve exceptions.
         </div>
       )}
 
@@ -81,13 +84,19 @@ export function ExceptionList() {
         <tbody>
           {exceptions.map((e) => (
             <tr key={e.id} className="border-b hover:bg-gray-50">
+              {/* ═══════════════════════════════════════════════
+                  LIEN VERS LA PAGE DÉTAIL DE L'EXCEPTION
+                  ═══════════════════════════════════════════════ */}
               <td className="p-3 text-sm">
                 <Link
-                  href={`/dashboard/documents/${e.document_id}`}
-                  className="text-blue-600 hover:underline"
+                  href={`/dashboard/exceptions/${e.id}`}
+                  className="text-blue-600 hover:underline font-medium"
                 >
                   {e.reason}
                 </Link>
+                <div className="text-xs text-gray-400 mt-1">
+                  Doc ID : {e.document_id.slice(0, 8)}…
+                </div>
               </td>
               <td className="p-3">
                 <Badge variant={e.severity === "high" ? "error" : "warning"}>
@@ -100,19 +109,30 @@ export function ExceptionList() {
                 </Badge>
               </td>
               <td className="p-3 text-sm text-gray-500">
-                {new Date(e.created_at).toLocaleString()}
+                {new Date(e.created_at).toLocaleString("fr-FR")}
               </td>
               <td className="p-3">
-                {e.status === "open" && canResolve ? (
-                  <Button
-                    onClick={() => resolve(e.id, e.document_id)}
-                    className="text-xs py-1 px-2"
+                <div className="flex items-center gap-2">
+                  {/* Lien vers le détail */}
+                  <Link
+                    href={`/dashboard/exceptions/${e.id}`}
+                    className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
                   >
-                    Resolve
-                  </Button>
-                ) : e.status === "open" ? (
-                  <span className="text-xs text-gray-400">Read-only</span>
-                ) : null}
+                    🔍 Détails
+                  </Link>
+
+                  {/* Bouton resolve (existant) */}
+                  {e.status === "open" && canResolve ? (
+                    <Button
+                      onClick={() => resolve(e.id, e.document_id)}
+                      className="text-xs py-1 px-2"
+                    >
+                      ✅ Resolve
+                    </Button>
+                  ) : e.status === "open" ? (
+                    <span className="text-xs text-gray-400">Read-only</span>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

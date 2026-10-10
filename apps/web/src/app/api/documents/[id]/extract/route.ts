@@ -5,6 +5,17 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// ═══════════════════════════════════════════════════════════════
+//  CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+
+const CONFIDENCE_THRESHOLD = 90;
+const SEVERITY_HIGH_THRESHOLD = 70;
+
+// ═══════════════════════════════════════════════════════════════
+//  ROUTE PRINCIPALE
+// ═══════════════════════════════════════════════════════════════
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -12,7 +23,6 @@ export async function POST(
   console.log('=== EXTRACT START ===');
 
   try {
-    // 1. Récupérer l'identifiant
     const { id } = await params;
 
     if (!id) {
@@ -26,7 +36,7 @@ export async function POST(
 
     const supabase = await createClient();
 
-    // 2. Charger le document depuis Supabase
+    // 1. Charger le document
     const { data: doc, error: docError } = await supabase
       .from('documents')
       .select('*')
@@ -35,34 +45,24 @@ export async function POST(
 
     if (docError || !doc) {
       console.error('Document introuvable:', docError?.message);
-
       return NextResponse.json(
         { error: 'Document introuvable.' },
         { status: 404 }
       );
     }
 
-    // 3. Vérifier si une extraction existe déjà
-    const { data: existing, error: existingError } = await supabase
+    // 2. Vérifier si une extraction existe déjà
+    const { data: existing } = await supabase
       .from('extractions')
       .select('*')
       .eq('document_id', id)
       .maybeSingle();
 
-    if (existingError) {
-      console.error(
-        'Erreur de lecture de l’extraction:',
-        existingError.message
-      );
-    }
-
     if (existing) {
       console.log('Extraction déjà existante.');
 
-      // Si le résumé manque, essayer de le générer.
       if (!doc.summary && doc.raw_text) {
         const summaryResult = await generateSummary(request, id);
-
         return NextResponse.json({
           success: true,
           extraction: existing,
@@ -80,18 +80,13 @@ export async function POST(
       });
     }
 
-    // 4. Télécharger le fichier
-    const { data: fileData, error: downloadError } =
-      await supabase.storage
-        .from('documents')
-        .download(doc.storage_path);
+    // 3. Télécharger le fichier
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(doc.storage_path);
 
     if (downloadError || !fileData) {
-      console.error(
-        'Erreur de téléchargement:',
-        downloadError?.message
-      );
-
+      console.error('Erreur de téléchargement:', downloadError?.message);
       return NextResponse.json(
         {
           error:
@@ -106,15 +101,13 @@ export async function POST(
     const fileName = String(doc.original_filename || '').toLowerCase();
     let rawText = '';
 
-    // 5. Extraire le texte selon le format
+    // 4. Extraire le texte selon le format
     if (fileName.endsWith('.pdf')) {
       console.log('Parsing PDF with unpdf...');
-
       const { extractText } = await import('unpdf');
       const result = await extractText(new Uint8Array(buffer), {
         mergePages: true,
       });
-
       rawText = result.text;
     } else if (
       fileName.endsWith('.jpg') ||
@@ -122,10 +115,8 @@ export async function POST(
       fileName.endsWith('.png')
     ) {
       console.log('Running OCR on image...');
-
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('fra+eng');
-
       try {
         const { data } = await worker.recognize(buffer);
         rawText = data.text;
@@ -134,43 +125,28 @@ export async function POST(
       }
     } else if (fileName.endsWith('.docx')) {
       console.log('Parsing Word document...');
-
       const mammoth = await import('mammoth');
       const result = await mammoth.extractRawText({ buffer });
-
       rawText = result.value;
-    } else if (
-      fileName.endsWith('.xlsx') ||
-      fileName.endsWith('.xls')
-    ) {
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       console.log('Parsing Excel file...');
-
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(buffer, { type: 'buffer' });
-
       let excelText = '';
-
       for (const sheetName of workbook.SheetNames) {
         const sheet = workbook.Sheets[sheetName];
-
         excelText += `\n=== Feuille : ${sheetName} ===\n`;
-        excelText += XLSX.utils.sheet_to_csv(sheet, {
-          FS: ' | ',
-        });
+        excelText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' });
       }
-
       rawText = excelText;
     } else if (fileName.endsWith('.csv')) {
       console.log('Parsing CSV file...');
-
       const { parse } = await import('csv-parse/sync');
-
       const records = parse(buffer.toString('utf-8'), {
         columns: true,
         skip_empty_lines: true,
         bom: true,
       });
-
       rawText = records
         .map((row) => Object.values(row as Record<string, unknown>).join(' | '))
         .join('\n');
@@ -193,7 +169,6 @@ export async function POST(
     }
 
     rawText = rawText.trim();
-
     console.log('Text extracted. Length:', rawText.length);
 
     if (!rawText) {
@@ -206,12 +181,11 @@ export async function POST(
       );
     }
 
-    // 6. Configurer le modèle IA
+    // 5. Configurer Groq
     const groqKey = process.env.GROQ_API_KEY;
 
     if (!groqKey) {
       console.error('GROQ_API_KEY non configurée.');
-
       return NextResponse.json(
         {
           error:
@@ -230,29 +204,57 @@ export async function POST(
 
     const model = 'openai/gpt-oss-120b';
 
-    // 7. Extraire les informations comptables
+    // 6. ✨ NOUVEAU PROMPT avec score de confiance
     const completion = await openai.chat.completions.create({
       model,
       messages: [
         {
           role: 'system',
           content:
-            'Tu es un assistant comptable. Extrais les informations structurées des factures et bons de livraison. Retourne uniquement un objet JSON valide. N’invente aucune donnée manquante : utilise null si une information est absente.',
+            'Tu es un assistant comptable expert. Analyse les factures et bons de livraison. Retourne UNIQUEMENT un objet JSON valide. N’invente AUCUNE donnée : utilise null si une information est absente. Évalue honnêtement ta confiance.',
         },
         {
           role: 'user',
-          content: `Extrais les champs suivants et retourne un JSON :
+          content: `Analyse ce document et retourne un JSON avec cette structure EXACTE :
 
-- invoice_number
-- invoice_date
-- supplier_name
-- supplier_tax_id
-- customer_name
-- total_amount_ht
-- total_vat
-- total_amount_ttc
-- currency
-- line_items : tableau avec description, quantity, unit_price et total
+{
+  "extracted": {
+    "invoice_number": "...",
+    "invoice_date": "YYYY-MM-DD",
+    "supplier_name": "...",
+    "supplier_tax_id": "...",
+    "customer_name": "...",
+    "total_amount_ht": 0.00,
+    "total_vat": 0.00,
+    "total_amount_ttc": 0.00,
+    "currency": "TND",
+    "line_items": [
+      { "description": "...", "quantity": 1, "unit_price": 0.00, "total": 0.00 }
+    ]
+  },
+  "confidence": 0-100,
+  "confidence_details": {
+    "invoice_number": { "score": 0-100, "reason": "..." },
+    "invoice_date": { "score": 0-100, "reason": "..." },
+    "supplier_name": { "score": 0-100, "reason": "..." },
+    "total_amount_ttc": { "score": 0-100, "reason": "..." }
+  },
+  "warnings": ["..."]
+}
+
+RÈGLES DE SCORING (confidence global 0-100) :
+- 95-100 : tous les champs critiques présents, montants cohérents, document net
+- 80-94  : champs présents mais un doute léger sur un montant ou une date
+- 60-79  : plusieurs champs manquants ou ambigus, nécessite une relecture
+- 0-59   : document non exploitable (texte illisible, structure inconnue, page blanche)
+
+DÉTAILS (confidence_details) : pour chaque champ critique, donne :
+- "score" : ta confiance dans CE champ spécifique (0-100)
+- "reason" : explication courte si score < 90
+
+WARNINGS : liste des problèmes détectés (ex: "Montant HT et TTC incohérents", "Date non trouvée")
+
+Si un champ est null, mets-lui un score très bas (ex: 20) avec une raison claire.
 
 Texte du document :
 ${rawText.slice(0, 8000)}`,
@@ -268,37 +270,50 @@ ${rawText.slice(0, 8000)}`,
       throw new Error('Le modèle IA a retourné une réponse vide.');
     }
 
-    let extractedFields: Record<string, unknown>;
+    // 7. Parser la réponse
+    let parsed: {
+      extracted?: Record<string, unknown>;
+      confidence?: number;
+      confidence_details?: Record<string, unknown>;
+      warnings?: string[];
+    };
 
     try {
-      extractedFields = JSON.parse(content);
+      parsed = JSON.parse(content);
     } catch {
-      throw new Error(
-        'Le modèle IA a retourné un JSON invalide.'
-      );
+      throw new Error('Le modèle IA a retourné un JSON invalide.');
     }
 
-    console.log('AI response received');
+    // Compatibilité : si l'IA renvoie les champs à la racine, on les récupère
+    const extractedFields = (parsed.extracted ?? parsed) as Record<string, unknown>;
 
-    // 8. Enregistrer l'extraction
+    const confidenceScore =
+      typeof parsed.confidence === 'number' && parsed.confidence >= 0 && parsed.confidence <= 100
+        ? parsed.confidence
+        : 50; // Score par défaut prudent si l'IA oublie de le fournir
+
+    const confidenceDetails = parsed.confidence_details ?? {};
+    const warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
+
+    console.log('AI response received. Confidence:', confidenceScore);
+
+    // 8. Enregistrer l'extraction avec le VRAI score
     const { data: extraction, error: insertError } = await supabase
       .from('extractions')
       .insert({
         document_id: id,
         extracted_fields: extractedFields,
-        confidence: 0.95,
+        confidence: confidenceScore / 100, // 0.87 pour 87%
+        confidence_details: confidenceDetails,
+        warnings: warnings,
         model_used: model,
-        prompt_version: 'v1',
+        prompt_version: 'v2',
       })
       .select()
       .single();
 
     if (insertError || !extraction) {
-      console.error(
-        'Erreur d’enregistrement de l’extraction:',
-        insertError?.message
-      );
-
+      console.error('Erreur d’enregistrement de l’extraction:', insertError?.message);
       return NextResponse.json(
         {
           error:
@@ -309,32 +324,58 @@ ${rawText.slice(0, 8000)}`,
       );
     }
 
-    // 9. Sauvegarder le texte extrait
+    // 9. ✨ DÉCISION AUTOMATIQUE selon le seuil
+    const shouldCreateException = confidenceScore < CONFIDENCE_THRESHOLD;
+    const newStatus = shouldCreateException ? 'exception' : 'auto_approved';
+
+    console.log(
+      `Decision: score=${confidenceScore}, status=${newStatus}, exception=${shouldCreateException}`
+    );
+
     const { error: updateError } = await supabase
       .from('documents')
       .update({
-        status: 'extracted',
+        status: newStatus,
         raw_text: rawText.slice(0, 50000),
+        confidence_score: confidenceScore,
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error(
-        'Erreur de mise à jour du document:',
-        updateError.message
-      );
+      console.error('Erreur de mise à jour du document:', updateError.message);
     }
 
-    // 10. Générer le résumé automatiquement
+    // 10. ✨ CRÉATION AUTOMATIQUE D'EXCEPTION si nécessaire
+    if (shouldCreateException) {
+      const severity =
+        confidenceScore < SEVERITY_HIGH_THRESHOLD ? 'high' : 'medium';
+
+      const { error: exceptionError } = await supabase
+        .from('exceptions')
+        .insert({
+          document_id: id,
+          reason: `Confiance IA faible (${confidenceScore.toFixed(0)}% < ${CONFIDENCE_THRESHOLD}%)`,
+          severity: severity,
+          status: 'open',
+        });
+
+      if (exceptionError) {
+        console.error(
+          'Erreur de création de l’exception:',
+          exceptionError.message
+        );
+      } else {
+        console.log('✅ Exception créée automatiquement');
+      }
+    }
+
+    // 11. Générer le résumé
     const summaryResult = await generateSummary(request, id);
 
     if (summaryResult.success) {
       console.log('Summary generated successfully.');
     } else {
-      console.error(
-        'Summary generation failed:',
-        summaryResult.error
-      );
+      console.error('Summary generation failed:', summaryResult.error);
     }
 
     console.log('=== EXTRACT SUCCESS ===');
@@ -342,6 +383,9 @@ ${rawText.slice(0, 8000)}`,
     return NextResponse.json({
       success: true,
       extraction,
+      confidence: confidenceScore,
+      status: newStatus,
+      exceptionCreated: shouldCreateException,
       summary: summaryResult.summary ?? null,
       summaryGenerated: summaryResult.success,
       summaryError: summaryResult.error ?? null,
@@ -349,7 +393,6 @@ ${rawText.slice(0, 8000)}`,
     });
   } catch (error) {
     console.error('=== EXTRACT CRASH ===', error);
-
     return NextResponse.json(
       {
         error:
@@ -362,7 +405,10 @@ ${rawText.slice(0, 8000)}`,
   }
 }
 
-// Fonction de génération du résumé
+// ═══════════════════════════════════════════════════════════════
+//  GÉNÉRATION DU RÉSUMÉ
+// ═══════════════════════════════════════════════════════════════
+
 async function generateSummary(
   request: Request,
   id: string
@@ -372,14 +418,12 @@ async function generateSummary(
   error?: string;
 }> {
   try {
-    // Pas besoin de NEXT_PUBLIC_APP_URL pour construire l'URL.
     const appUrl = (
       process.env.NEXT_PUBLIC_APP_URL ||
       new URL(request.url).origin
     ).replace(/\/+$/, '');
 
-    const summaryUrl =
-      `${appUrl}/api/documents/${encodeURIComponent(id)}/summarize`;
+    const summaryUrl = `${appUrl}/api/documents/${encodeURIComponent(id)}/summarize`;
 
     console.log('=== SUMMARY REQUEST ===');
     console.log('Summary URL:', summaryUrl);
@@ -388,7 +432,8 @@ async function generateSummary(
       method: 'POST',
       cache: 'no-store',
       headers: {
-        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
+        'x-vercel-protection-bypass':
+          process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
       },
     });
 
@@ -415,18 +460,12 @@ async function generateSummary(
 
       console.error('Summary API failed:', errorMessage);
 
-      return {
-        success: false,
-        error: errorMessage,
-      };
+      return { success: false, error: errorMessage };
     }
 
     console.log('=== SUMMARY SUCCESS ===');
 
-    return {
-      success: true,
-      summary: result.summary,
-    };
+    return { success: true, summary: result.summary };
   } catch (error) {
     const errorMessage =
       error instanceof Error
@@ -435,9 +474,6 @@ async function generateSummary(
 
     console.error('Summary request failed:', errorMessage);
 
-    return {
-      success: false,
-      error: errorMessage,
-    };
+    return { success: false, error: errorMessage };
   }
 }
