@@ -178,23 +178,30 @@ export default function EmailSettingsPage() {
   </div>
 
   <div>
-    <label className="block text-sm font-semibold mb-1">
-      Seuil de sévérité "haute" (%)
-    </label>
-    <input
-      type="number"
-      min="0"
-      max="100"
-      value={settings.confidence_high_severity}
-      onChange={(e) =>
-        setSettings({ ...settings, confidence_high_severity: e.target.value })
-      }
-      className="w-full border rounded px-3 py-2"
-    />
-    <p className="text-xs text-gray-500 mt-1">
-      Si le score &lt; cette valeur → exception de sévérité HAUTE.
-    </p>
-  </div>
+  <label className="block text-sm font-semibold mb-1">
+    Heure d'envoi (UTC)
+  </label>
+  <select
+    value={settings.cron_hour}
+    onChange={(e) =>
+      setSettings({ ...settings, cron_hour: e.target.value })
+    }
+    className="w-full border rounded px-3 py-2"
+  >
+    {Array.from({ length: 24 }, (_, i) => {
+      const h = String(i).padStart(2, "0");
+      return (
+        <option key={h} value={h}>
+          {h}:00 UTC (±59 min)
+        </option>
+      );
+    })}
+  </select>
+  <p className="text-xs text-gray-500 mt-1">
+    ⚠️ Sur le plan Vercel Hobby, l'envoi peut arriver avec ±1h de décalage.
+    Pour une précision exacte, passez au plan Pro.
+  </p>
+</div>
 
   <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
     📊 Exemple avec seuil à <strong>{settings.confidence_threshold}%</strong> :

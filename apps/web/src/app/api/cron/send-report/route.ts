@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Resend } from 'resend';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
@@ -15,9 +18,10 @@ export async function GET(request: Request) {
 
     console.log('=== CRON START ===');
 
-    const supabase = await createClient();
+    // 2. Utiliser le client admin (bypass RLS)
+    const supabase = createAdminClient();
 
-    // 2. Lire les réglages
+    // 3. Lire les réglages
     const { data: settingsData } = await supabase
       .from('settings')
       .select('key, value');
@@ -27,26 +31,53 @@ export async function GET(request: Request) {
       settings[row.key] = row.value || '';
     }
 
-    // 3. Vérifier si le cron est activé
+    // 4. Vérifier si le cron est activé
     if (settings.cron_enabled !== 'true') {
       console.log('Cron disabled, skipping');
       return NextResponse.json({ skipped: true, reason: 'disabled' });
     }
 
-    // 4. Vérifier si c'est le bon moment
+    // ═══════════════════════════════════════════════════════════
+    //  5. Vérifier si c'est le bon moment (UTC)
+    //     ⚠️ Tolérance ±1h pour Hobby (±59 min de précision Vercel)
+    // ═══════════════════════════════════════════════════════════
     const now = new Date();
-    const currentHour = String(now.getUTCHours()).padStart(2, '0');
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentHourUTC = now.getUTCHours();
+
+    const dayNames = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ];
     const currentDay = dayNames[now.getUTCDay()];
     const currentDate = now.getUTCDate();
 
-    const targetHour = settings.cron_hour || '09';
+    const targetHour = parseInt(settings.cron_hour || '7', 10);
 
-    // Vérifier l'heure
-    if (currentHour !== targetHour) {
-      console.log(`Not the right hour (${currentHour} vs ${targetHour})`);
-      return NextResponse.json({ skipped: true, reason: 'wrong_hour' });
+    // ⭐ Tolérance : accepter ±1h autour de l'heure cible
+    // Ex: cible 7h → accepter 6h, 7h, 8h
+    const hourDiff = Math.abs(currentHourUTC - targetHour);
+    const isValidHour = hourDiff <= 1 || hourDiff === 23;
+
+    if (!isValidHour) {
+      console.log(
+        `Not the right hour (${currentHourUTC} UTC vs ${targetHour} UTC, diff=${hourDiff})`
+      );
+      return NextResponse.json({
+        skipped: true,
+        reason: 'wrong_hour',
+        currentHourUTC,
+        targetHour,
+      });
     }
+
+    console.log(
+      `✅ Hour OK (${currentHourUTC} UTC, target ${targetHour} UTC, diff=${hourDiff}h)`
+    );
 
     // Vérifier le jour selon la fréquence
     const frequency = settings.cron_frequency || 'weekly';
@@ -60,24 +91,32 @@ export async function GET(request: Request) {
       return NextResponse.json({ skipped: true, reason: 'wrong_date' });
     }
 
-    // Vérifier qu'on n'a pas déjà envoyé aujourd'hui
+    // Vérifier qu'on n'a pas déjà envoyé récemment (12h)
     if (settings.cron_last_run) {
       const lastRun = new Date(settings.cron_last_run);
       const hoursSince = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
       if (hoursSince < 12) {
-        console.log('Already sent recently');
-        return NextResponse.json({ skipped: true, reason: 'already_sent' });
+        console.log(`Already sent recently (${hoursSince.toFixed(1)}h ago)`);
+        return NextResponse.json({
+          skipped: true,
+          reason: 'already_sent',
+          hoursSince,
+        });
       }
     }
 
-    // 5. Générer le rapport PDF
+    // ═══════════════════════════════════════════════════════════
+    //  6. Générer le rapport PDF
+    // ═══════════════════════════════════════════════════════════
     console.log('Generating report...');
     const { data: documents } = await supabase
       .from('documents')
-      .select(`
+      .select(
+        `
         id, original_filename, type, status, created_at,
         extractions (extracted_fields)
-      `)
+      `
+      )
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -112,13 +151,25 @@ export async function GET(request: Request) {
         page = pdfDoc.addPage([595, 842]);
         y = height - 60;
       }
-      const extraction = Array.isArray(doc.extractions) ? doc.extractions[0] : doc.extractions;
+      const extraction = Array.isArray(doc.extractions)
+        ? doc.extractions[0]
+        : doc.extractions;
       const fields = extraction?.extracted_fields || {};
       const amount = parseFloat(fields.total_amount_ttc || '0') || 0;
       totalGeneral += amount;
 
-      page.drawText((doc.original_filename || '').slice(0, 50), { x: 50, y, size: 9, font });
-      page.drawText(amount > 0 ? amount.toFixed(2) + ' DT' : '-', { x: 420, y, size: 9, font });
+      page.drawText((doc.original_filename || '').slice(0, 50), {
+        x: 50,
+        y,
+        size: 9,
+        font,
+      });
+      page.drawText(amount > 0 ? amount.toFixed(2) + ' DT' : '-', {
+        x: 420,
+        y,
+        size: 9,
+        font,
+      });
       y -= 16;
     }
 
@@ -134,10 +185,15 @@ export async function GET(request: Request) {
     const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
 
-    // 6. Envoyer par email
+    // ═══════════════════════════════════════════════════════════
+    //  7. Envoyer par email
+    // ═══════════════════════════════════════════════════════════
     const recipient = settings.cron_email_to || settings.email_to;
     if (!recipient) {
-      return NextResponse.json({ error: 'No recipient email' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No recipient email' },
+        { status: 400 }
+      );
     }
 
     const resend = new Resend(settings.resend_api_key);
@@ -164,7 +220,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: emailError.message }, { status: 500 });
     }
 
-    // 7. Mettre à jour la date d'exécution
+    // ═══════════════════════════════════════════════════════════
+    //  8. Mettre à jour la date d'exécution
+    // ═══════════════════════════════════════════════════════════
     await supabase
       .from('settings')
       .update({ value: now.toISOString() })

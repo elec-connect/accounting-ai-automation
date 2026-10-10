@@ -69,3 +69,4 @@ desktop.ini
 temp/
 tmp/
 *.bak
+.vercel

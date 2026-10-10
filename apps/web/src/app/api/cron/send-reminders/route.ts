@@ -47,24 +47,35 @@ export async function GET(request: Request) {
       return NextResponse.json({ skipped: true, reason: 'disabled' });
     }
 
-    // 5. Vérifier si c'est le bon moment (UTC)
+    // ═══════════════════════════════════════════════════════════
+    //  5. Vérifier si c'est le bon moment (UTC)
+    //     ⚠️ Tolérance ±1h pour Hobby (±59 min de précision Vercel)
+    // ═══════════════════════════════════════════════════════════
     const now = new Date();
-    const currentHour = String(now.getUTCHours()).padStart(2, '0');
-    const targetHour = settings.reminder_hour || '08';
+    const currentHourUTC = now.getUTCHours();
+    const targetHour = parseInt(settings.reminder_hour || '8', 10);
 
-    if (currentHour !== targetHour) {
-      console.log(`Not the right hour (${currentHour} UTC vs ${targetHour})`);
+    // ⭐ Tolérance : accepter ±1h autour de l'heure cible
+    const hourDiff = Math.abs(currentHourUTC - targetHour);
+    const isValidHour = hourDiff <= 1 || hourDiff === 23;
+
+    if (!isValidHour) {
+      console.log(
+        `Not the right hour (${currentHourUTC} UTC vs ${targetHour} UTC, diff=${hourDiff})`
+      );
       return NextResponse.json({
         skipped: true,
         reason: 'wrong_hour',
-        currentHourUTC: currentHour,
-        configuredHour: targetHour,
+        currentHourUTC,
+        targetHour,
       });
     }
 
-    console.log(`✅ Correct hour (${currentHour} UTC)`);
+    console.log(
+      `✅ Hour OK (${currentHourUTC} UTC, target ${targetHour} UTC, diff=${hourDiff}h)`
+    );
 
-    // 6. Vérifier qu'on n'a pas déjà envoyé aujourd'hui
+    // 6. Vérifier qu'on n'a pas déjà envoyé récemment (12h)
     if (settings.reminder_last_run) {
       const lastRun = new Date(settings.reminder_last_run);
       const hoursSince = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
@@ -107,11 +118,9 @@ export async function GET(request: Request) {
 
     // Filtrer celles à relancer
     const toRemind = (exceptions ?? []).filter((e) => {
-      // Vérifier le nombre max de relances
       const count = e.reminder_count ?? 0;
       if (count >= maxCount) return false;
 
-      // Vérifier le délai depuis la dernière relance (ou la création)
       const ref = e.last_reminder_at || e.created_at;
       return new Date(ref) < cutoff;
     });
@@ -120,7 +129,6 @@ export async function GET(request: Request) {
 
     if (toRemind.length === 0) {
       console.log('Nothing to remind');
-      // Mettre à jour la date d'exécution
       await supabase
         .from('settings')
         .update({ value: now.toISOString(), updated_at: now.toISOString() })
@@ -135,7 +143,6 @@ export async function GET(request: Request) {
 
     for (const exc of toRemind) {
       try {
-        // Charger le document associé
         const { data: doc } = await supabase
           .from('documents')
           .select('original_filename, confidence_score')
@@ -154,7 +161,6 @@ export async function GET(request: Request) {
           `Sending reminder #${reminderNumber} for ${doc.original_filename}`
         );
 
-        // Envoyer l'email
         await sendExceptionEmail({
           documentId: exc.document_id,
           filename: `[RELANCE #${reminderNumber}] ${doc.original_filename || 'Document'}`,
@@ -163,7 +169,6 @@ export async function GET(request: Request) {
           severity: exc.severity,
         });
 
-        // Mettre à jour le compteur de relances
         const { error: updateError } = await supabase
           .from('exceptions')
           .update({
@@ -194,7 +199,9 @@ export async function GET(request: Request) {
       .update({ value: now.toISOString(), updated_at: now.toISOString() })
       .eq('key', 'reminder_last_run');
 
-    console.log(`=== CRON REMINDERS SUCCESS === Sent: ${sent}, Failed: ${failed}`);
+    console.log(
+      `=== CRON REMINDERS SUCCESS === Sent: ${sent}, Failed: ${failed}`
+    );
 
     return NextResponse.json({
       success: true,
