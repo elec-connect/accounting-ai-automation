@@ -12,7 +12,10 @@ export async function POST(request: Request) {
     console.log('File received:', file?.name, file?.size);
 
     if (!file) {
-      return NextResponse.json({ error: 'Aucun fichier fourni.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Aucun fichier fourni.' },
+        { status: 400 }
+      );
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -66,7 +69,10 @@ export async function POST(request: Request) {
 
     if (uploadError) {
       return NextResponse.json(
-        { error: 'Erreur lors de l\'upload du fichier : ' + uploadError.message },
+        {
+          error:
+            'Erreur lors de l\u2019upload du fichier : ' + uploadError.message,
+        },
         { status: 500 }
       );
     }
@@ -90,11 +96,8 @@ export async function POST(request: Request) {
     console.log('Insert error:', insertError);
 
     if (insertError) {
-      // Gestion de sécurité si le doublon est détecté au moment de l'insertion
       if (insertError.code === '23505') {
-        // Supprimer le fichier qu'on vient d'uploader (orphelin)
         await supabase.storage.from('documents').remove([storagePath]);
-
         return NextResponse.json(
           {
             error: 'Ce document existe déjà dans la base.',
@@ -105,16 +108,68 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(
-        { error: 'Erreur lors de l\'enregistrement : ' + insertError.message },
+        {
+          error:
+            'Erreur lors de l\u2019enregistrement : ' + insertError.message,
+        },
         { status: 500 }
       );
     }
 
     console.log('=== UPLOAD SUCCESS ===');
+
+    // ═══════════════════════════════════════════════════════════
+    //  ✨ DÉCLENCHEMENT DE L'EXTRACTION SELON LE MODE
+    // ═══════════════════════════════════════════════════════════
+
+    let extractionTriggered = false;
+    let pipelineMode = 'auto';
+
+    try {
+      // Lire le mode depuis settings
+      const { data: modeSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'pipeline_mode')
+        .maybeSingle();
+
+      pipelineMode = modeSetting?.value || 'auto';
+      console.log(`Pipeline mode: ${pipelineMode}`);
+
+      if (pipelineMode === 'auto') {
+        console.log('Auto mode: triggering extraction...');
+
+        const appUrl = (
+          process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+        ).replace(/\/+$/, '');
+
+        // Déclencher l'extraction (sans attendre la fin pour ne pas bloquer l'upload)
+        fetch(`${appUrl}/api/documents/${data.id}/extract`, {
+          method: 'POST',
+          headers: {
+            'x-vercel-protection-bypass':
+              process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
+          },
+        }).catch((err) => {
+          console.error('Extraction trigger failed:', err);
+        });
+
+        extractionTriggered = true;
+        console.log('Extraction triggered asynchronously');
+      } else {
+        console.log('Manual mode: extraction must be triggered manually');
+      }
+    } catch (modeError) {
+      console.error('Error reading pipeline_mode:', modeError);
+      // En cas d'erreur, on reste en mode manuel par défaut
+    }
+
     return NextResponse.json({
       success: true,
       document: data,
       message: 'Document uploadé avec succès.',
+      pipelineMode,
+      extractionTriggered,
     });
   } catch (error) {
     console.error('=== UPLOAD CRASH ===', error);

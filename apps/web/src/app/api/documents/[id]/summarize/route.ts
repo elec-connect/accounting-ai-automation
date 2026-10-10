@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
@@ -12,28 +11,22 @@ export async function POST(
   console.log('=== SUMMARIZE START ===');
 
   try {
-    // 1. Récupérer l'identifiant du document
     const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Identifiant du document manquant.',
-        },
+        { success: false, error: 'Identifiant du document manquant.' },
         { status: 400 }
       );
     }
 
     console.log('Document ID:', id);
 
-    // 2. Vérifier les variables d'environnement Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error('Configuration Supabase incomplète.');
-
       return NextResponse.json(
         {
           success: false,
@@ -44,19 +37,10 @@ export async function POST(
       );
     }
 
-    // 3. Créer le client administrateur Supabase
-    const supabase = createAdminClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabase = createAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
-    // 4. Charger le document
     const { data: doc, error: docError } = await supabase
       .from('documents')
       .select('id, raw_text, summary')
@@ -64,24 +48,15 @@ export async function POST(
       .single();
 
     if (docError || !doc) {
-      console.error(
-        'Document introuvable:',
-        docError?.message
-      );
-
+      console.error('Document introuvable:', docError?.message);
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Document introuvable.',
-        },
+        { success: false, error: 'Document introuvable.' },
         { status: 404 }
       );
     }
 
-    // 5. Vérifier si un résumé existe déjà
     if (doc.summary && doc.summary.trim().length > 0) {
       console.log('Résumé déjà disponible.');
-
       return NextResponse.json({
         success: true,
         summary: doc.summary,
@@ -89,35 +64,31 @@ export async function POST(
       });
     }
 
-    // 6. Vérifier le texte extrait
     if (!doc.raw_text || !doc.raw_text.trim()) {
       return NextResponse.json(
         {
           success: false,
           error:
-            'Aucun texte disponible. Lancez d’abord l’extraction du document.',
+            'Aucun texte disponible. Lancez d\u2019abord l\u2019extraction du document.',
         },
         { status: 400 }
       );
     }
 
-    // 7. Vérifier la clé API Groq
     const groqKey = process.env.GROQ_API_KEY;
 
     if (!groqKey) {
       console.error('GROQ_API_KEY non configurée.');
-
       return NextResponse.json(
         {
           success: false,
           error:
-            'GROQ_API_KEY est absente. Ajoutez-la dans .env.local ou dans les variables d’environnement de Vercel.',
+            'GROQ_API_KEY est absente. Ajoutez-la dans .env.local ou dans les variables d\u2019environnement de Vercel.',
         },
         { status: 500 }
       );
     }
 
-    // 8. Initialiser Groq via son API compatible OpenAI
     const { default: OpenAI } = await import('openai');
 
     const openai = new OpenAI({
@@ -127,40 +98,79 @@ export async function POST(
 
     const model = 'openai/gpt-oss-120b';
 
-    // 9. Générer un résumé en français
-    console.log('Generating summary with Groq...');
+    // ✨ Troncature intelligente
+    const truncatedText =
+      doc.raw_text.length > 6000
+        ? doc.raw_text.slice(0, 6000) + '\n\n[…document tronqué…]'
+        : doc.raw_text;
 
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Tu es un assistant comptable francophone. Résume fidèlement les documents comptables en français. Indique le type de document, les parties concernées, les montants et les dates importantes lorsqu’ils sont présents. N’invente jamais les informations manquantes.',
-        },
-        {
-          role: 'user',
-          content:
-            'Résume ce document en une ou deux phrases courtes, idéalement en 200 caractères maximum :\n\n' +
-            doc.raw_text.slice(0, 6000),
-        },
-      ],
-      temperature: 0.2,
-      max_tokens: 200,
-    });
+    console.log(
+      'Generating summary with Groq... (text length:',
+      truncatedText.length,
+      ')'
+    );
 
-    const summary =
-      completion.choices[0]?.message?.content?.trim() || '';
+    // ✨ Retry : 2 tentatives
+    let summary = '';
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`Attempt ${attempt}/2`);
+
+        const completion = await openai.chat.completions.create({
+          model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Tu es un assistant comptable francophone. Résume fidèlement les documents comptables en français. Indique le type de document, les parties concernées, les montants et les dates importantes lorsqu\u2019ils sont présents. N\u2019invente jamais les informations manquantes. Réponds UNIQUEMENT par le résumé, sans introduction ni conclusion.',
+            },
+            {
+              role: 'user',
+              content: `Résume ce document en 1-2 phrases courtes (200 caractères maximum) :\n\n${truncatedText}`,
+            },
+          ],
+          temperature: 0.2,
+          max_tokens: 300,
+        });
+
+        const content =
+          completion.choices?.[0]?.message?.content?.trim() || '';
+
+        // ✨ Debug complet si vide
+        if (!content) {
+          console.warn(
+            'Empty response. Full Groq response:',
+            JSON.stringify(completion, null, 2)
+          );
+          lastError = new Error('Réponse vide');
+          continue;
+        }
+
+        summary = content;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error('Erreur inconnue');
+        console.error(`Attempt ${attempt} failed:`, lastError.message);
+      }
+    }
 
     if (!summary) {
-      throw new Error(
-        'Le modèle IA a retourné un résumé vide.'
+      console.error('All attempts failed. Last error:', lastError?.message);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Le modèle IA n\u2019a pas pu générer de résumé. ' +
+            (lastError?.message || 'Réponse vide'),
+        },
+        { status: 500 }
       );
     }
 
     console.log('Summary generated:', summary);
 
-    // 10. Enregistrer le résumé dans Supabase
     const { error: updateError } = await supabase
       .from('documents')
       .update({ summary })
@@ -171,7 +181,6 @@ export async function POST(
         'Erreur lors de la sauvegarde du résumé:',
         updateError.message
       );
-
       return NextResponse.json(
         {
           success: false,
@@ -192,7 +201,6 @@ export async function POST(
     });
   } catch (error) {
     console.error('=== SUMMARIZE ERROR ===', error);
-
     return NextResponse.json(
       {
         success: false,

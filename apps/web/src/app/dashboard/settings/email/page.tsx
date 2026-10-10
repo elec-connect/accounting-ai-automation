@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
+import { PipelineModeToggle } from "@/components/settings/PipelineModeToggle";
 
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
@@ -122,29 +123,44 @@ export default function EmailSettingsPage() {
             </div>
 
             {/* ═══════════════════════════════════════════
-    SECTION VARIABLES D'ENVIRONNEMENT
-    ═══════════════════════════════════════════ */}
-<h3
-  id="env-status"
-  className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
->
-  🔐 Variables d'environnement
-</h3>
-<p className="text-sm text-gray-500 mb-6">
-  État des variables d'environnement configurées sur Vercel.
-  Les variables critiques doivent être présentes pour que l'application fonctionne.
-</p>
+                SECTION VARIABLES D'ENVIRONNEMENT
+                ═══════════════════════════════════════════ */}
+            <h3
+              id="env-status"
+              className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
+            >
+              🔐 Variables d'environnement
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              État des variables d'environnement configurées sur Vercel.
+              Les variables critiques doivent être présentes pour que l'application fonctionne.
+            </p>
 
-<EnvironmentStatus />
+            <EnvironmentStatus />
 
-<div className="border-b mt-8 mb-8"></div>
+            <div className="border-b mt-8 mb-8"></div>
 
-{/* ═══════════════════════════════════════════
-    SECTION EMAIL
-    ═══════════════════════════════════════════ */}
-<h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-  📧 Configuration Email (Resend)
-</h3>
+            {/* ═══════════════════════════════════════════
+                ✨ NOUVELLE SECTION : MODE DE TRAITEMENT
+                ═══════════════════════════════════════════ */}
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+              🔄 Mode de traitement
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Choisissez si les documents sont traités automatiquement par l'IA
+              après l'upload ou manuellement à la demande.
+            </p>
+
+            <PipelineModeToggle />
+
+            <div className="border-b mt-8 mb-8"></div>
+
+            {/* ═══════════════════════════════════════════
+                SECTION EMAIL
+                ═══════════════════════════════════════════ */}
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+              📧 Configuration Email (Resend)
+            </h3>
             <p className="text-sm text-gray-500 mb-6">
               Configurez votre compte Resend pour envoyer des rapports par email.
               Obtenez une clé API gratuite sur{" "}

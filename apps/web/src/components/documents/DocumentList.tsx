@@ -1,215 +1,228 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { UploadButton } from './UploadButton';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 type Document = {
   id: string;
+  original_filename: string | null;
   type: string;
-  status: string;
-  original_filename: string;
-  sender_email: string;
-  created_at: string;
+  sender_email: string | null;
   summary: string | null;
+  status: string;
+  confidence_score: number | null;
+  created_at: string;
 };
 
-const statusVariants: Record<string, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
-  received: 'info',
-  extracted: 'info',
-  auto_approved: 'success',
-  review_needed: 'warning',
-  approved: 'success',
-  pending_approval: 'warning',
-  delivered: 'success',
-  exception: 'error',
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  received:      { label: "📥 Reçu",       color: "bg-gray-100 text-gray-800" },
+  extracted:     { label: "🤖 Extrait",    color: "bg-blue-100 text-blue-800" },
+  auto_approved: { label: "✨ Auto",       color: "bg-green-100 text-green-800" },
+  exception:     { label: "⚠️ Exception",  color: "bg-orange-100 text-orange-800" },
+  approved:      { label: "✅ Approuvé",   color: "bg-green-100 text-green-800" },
+  delivered:     { label: "📤 Livré",      color: "bg-purple-100 text-purple-800" },
+  rejected:      { label: "❌ Rejeté",     color: "bg-red-100 text-red-800" },
+  unknown:       { label: "❓ Inconnu",    color: "bg-yellow-100 text-yellow-800" },
 };
+
+function getConfidenceBadge(score: number | null) {
+  if (score == null) return null;
+
+  const color =
+    score >= 90
+      ? "bg-green-100 text-green-800"
+      : score >= 70
+      ? "bg-orange-100 text-orange-800"
+      : "bg-red-100 text-red-800";
+
+  return (
+    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${color}`}>
+      🤖 {score.toFixed(0)}%
+    </span>
+  );
+}
 
 export function DocumentList() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  async function handleSendEmail() {
-    const email = prompt("Entrez l'adresse email du destinataire :");
-    if (!email) return;
-
-    setSending(true);
-    try {
-      const res = await fetch('/api/documents/report/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        alert('Erreur : ' + result.error);
-      } else {
-        alert('✅ Email envoyé avec succès !');
-      }
-    } catch (err) {
-      alert('Erreur : ' + (err instanceof Error ? err.message : 'Inconnue'));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleDelete(id: string, filename: string) {
-    const confirmed = confirm(
-      `⚠️ Supprimer définitivement « ${filename} » ?\n\n` +
-      `Cette action est irréversible.\n` +
-      `Le document, son extraction et son fichier seront supprimés.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      const res = await fetch(`/api/documents/${id}/delete`, {
-        method: 'DELETE',
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        alert('❌ Erreur : ' + result.error);
-      } else {
-        alert('✅ Document supprimé.');
-        loadDocuments();
-      }
-    } catch (err) {
-      alert('Erreur : ' + (err instanceof Error ? err.message : 'Inconnue'));
-    }
-  }
-
-  const loadDocuments = useCallback(() => {
-    const supabase = createClient();
-    supabase
-      .from('documents')
-      .select('*, summary')
-      .order('created_at', { ascending: false })
-      .limit(100)
-      .then(({ data }) => {
-        setDocuments(data || []);
-        setLoading(false);
-      });
-  }, []);
-
-  function handleRefresh() {
+  async function loadDocuments() {
     setRefreshing(true);
-    loadDocuments();
-    setTimeout(() => setRefreshing(false), 500);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("documents")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setDocuments(data || []);
+    setLoading(false);
+    setRefreshing(false);
   }
 
   useEffect(() => {
     loadDocuments();
-  }, [loadDocuments]);
+  }, []);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Supprimer ce document ?")) return;
+    const supabase = createClient();
+    await supabase.from("documents").delete().eq("id", id);
+    await loadDocuments();
+  }
+
+  // Filtres
+  const filteredDocuments =
+    statusFilter === "all"
+      ? documents
+      : documents.filter((d) => d.status === statusFilter);
+
+  const counts = {
+    all: documents.length,
+    received: documents.filter((d) => d.status === "received").length,
+    extracted: documents.filter((d) => d.status === "extracted").length,
+    auto_approved: documents.filter((d) => d.status === "auto_approved").length,
+    exception: documents.filter((d) => d.status === "exception").length,
+    approved: documents.filter((d) => d.status === "approved").length,
+    delivered: documents.filter((d) => d.status === "delivered").length,
+  };
+
+  if (loading) return <p className="text-gray-500">Chargement…</p>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">All Documents</h2>
+      {/* Barre d'actions */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex gap-2 flex-wrap">
-          <a
-            href="/api/documents/report"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            📄 PDF
-          </a>
-          <a
-            href="/api/documents/report/excel"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
-          >
-            📊 Excel
-          </a>
-          <button
-            onClick={handleSendEmail}
-            disabled={sending}
-            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-          >
-            {sending ? 'Envoi...' : '📧 Email'}
-          </button>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
-            title="Rafraîchir la liste"
-          >
-            {refreshing ? '⏳' : '🔄'} Rafraîchir
-          </button>
-          <UploadButton onUploaded={loadDocuments} />
+          {[
+            { value: "all",           label: "Tous",        icon: "📋" },
+            { value: "received",      label: "Reçus",       icon: "📥" },
+            { value: "extracted",     label: "Extraits",    icon: "🤖" },
+            { value: "auto_approved", label: "Auto",        icon: "✨" },
+            { value: "exception",     label: "Exceptions",  icon: "⚠️" },
+            { value: "approved",      label: "Approuvés",   icon: "✅" },
+            { value: "delivered",     label: "Livrés",      icon: "📤" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                statusFilter === tab.value
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {tab.icon} {tab.label}
+              <span className="ml-1.5 text-xs opacity-70">
+                ({counts[tab.value as keyof typeof counts] ?? 0})
+              </span>
+            </button>
+          ))}
         </div>
+
+        <button
+          onClick={loadDocuments}
+          disabled={refreshing}
+          className="px-3 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+        >
+          {refreshing ? "⏳ …" : "🔄 Rafraîchir"}
+        </button>
       </div>
 
-      {loading && <p className="text-gray-500">Loading documents...</p>}
-      {!loading && documents.length === 0 && (
-        <p className="text-gray-500">
-          No documents yet. Click &quot;+ Upload Document&quot; to add one.
-        </p>
-      )}
-
-      {!loading && documents.length > 0 && (
-        <Card>
-          <table className="w-full">
-            <thead className="border-b-2">
+      {/* Tableau */}
+      <Card>
+        <table className="w-full">
+          <thead className="border-b-2">
+            <tr>
+              <th className="text-left p-3 text-sm font-medium">Filename</th>
+              <th className="text-left p-3 text-sm font-medium">Type</th>
+              <th className="text-left p-3 text-sm font-medium">Sender</th>
+              <th className="text-left p-3 text-sm font-medium">Résumé</th>
+              <th className="text-left p-3 text-sm font-medium">Score IA</th>
+              <th className="text-left p-3 text-sm font-medium">Statut</th>
+              <th className="text-left p-3 text-sm font-medium">Reçu</th>
+              <th className="text-left p-3 text-sm font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredDocuments.length === 0 ? (
               <tr>
-                <th className="text-left p-3">Filename</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Sender</th>
-                <th className="text-left p-3">Résumé</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Received</th>
-                <th className="text-left p-3">Actions</th>
+                <td colSpan={8} className="p-8 text-center text-gray-500">
+                  Aucun document pour ce filtre.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc) => (
+            ) : (
+              filteredDocuments.map((doc) => (
                 <tr key={doc.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">
+                  <td className="p-3 text-sm">
                     <Link
                       href={`/dashboard/documents/${doc.id}`}
                       className="text-blue-600 hover:underline"
                     >
-                      {doc.original_filename}
+                      {doc.original_filename || "sans nom"}
                     </Link>
                   </td>
-                  <td className="p-3">{doc.type}</td>
-                  <td className="p-3">{doc.sender_email}</td>
-                  <td className="p-3 text-sm text-gray-600 max-w-md">
-                    {doc.summary || (
-                      <span className="text-gray-400 italic">Pas de résumé</span>
+                  <td className="p-3">
+                    <Badge variant="info">{doc.type}</Badge>
+                  </td>
+                  <td className="p-3 text-xs text-gray-500 truncate max-w-[150px]">
+                    {doc.sender_email || "—"}
+                  </td>
+                  <td className="p-3 text-xs text-gray-600 max-w-[300px]">
+                    <div className="line-clamp-2">
+                      {doc.summary || "Pas de résumé"}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    {getConfidenceBadge(doc.confidence_score) || (
+                      <span className="text-xs text-gray-400">—</span>
                     )}
                   </td>
                   <td className="p-3">
-                    <Badge variant={statusVariants[doc.status] || 'default'}>
-                      {doc.status}
-                    </Badge>
+                    {(() => {
+                      const config = STATUS_LABELS[doc.status] || {
+                        label: doc.status,
+                        color: "bg-gray-100 text-gray-800",
+                      };
+                      return (
+                        <span
+                          className={`text-xs font-semibold px-2 py-1 rounded-full ${config.color}`}
+                        >
+                          {config.label}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="p-3 text-xs text-gray-500">
+                    {new Date(doc.created_at).toLocaleString("fr-FR")}
                   </td>
                   <td className="p-3">
-                    {new Date(doc.created_at).toLocaleString()}
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => handleDelete(doc.id, doc.original_filename)}
-                      className="text-red-600 hover:text-red-800 hover:underline text-sm font-medium"
-                      title="Supprimer définitivement"
-                    >
-                      🗑️ Supprimer
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/documents/${doc.id}`}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
+                        title="Voir le détail"
+                      >
+                        👁️
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(doc.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Supprimer"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }
