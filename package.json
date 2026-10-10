@@ -1,0 +1,30 @@
+{
+  "name": "accounting-ai-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Automatisation comptable avec IA",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "tesseract.js",
+      "esbuild",
+      "sharp"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
