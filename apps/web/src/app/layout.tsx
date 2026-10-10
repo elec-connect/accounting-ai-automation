@@ -1,4 +1,4 @@
-﻿// @ts-expect-error Next.js handles global CSS imports at build time.
+﻿// @ts-expect-error CSS imports are handled by Next.js; this is a valid global stylesheet import.
 import "./globals.css";
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
