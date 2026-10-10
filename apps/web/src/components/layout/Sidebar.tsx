@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useProfile } from "@/lib/auth/use-profile";
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { ExceptionsBadge } from "./ExceptionsBadge";
 
 type NavItem = {
   href: string;
@@ -15,11 +16,14 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/documents", label: "Documents" },
   { href: "/dashboard/search", label: "🔍 Search" },
-  { href: "/dashboard/exceptions", label: "Exceptions" },
+  { href: "/dashboard/exceptions", label: "⚠️ Exceptions" },
   { href: "/dashboard/ask", label: "Ask AI" },
   { href: "/dashboard/audit", label: "Audit Log", adminOnly: true },
   { href: "/dashboard/settings/users", label: "Users", adminOnly: true },
-  { href: "/dashboard/settings/email", label: "⚙️ Settings", adminOnly: true }
+  { href: "/dashboard/settings/email", label: "⚙️ Settings", adminOnly: true },
+  { href: "/dashboard/reports", label: "📊 Rapports" },
+  { href: "/dashboard/documents/search", label: "🔍 Recherche avancée" },
+  { href: "/dashboard/settings/security", label: "🔒 Sécurité" }
 ];
 
 export function Sidebar() {

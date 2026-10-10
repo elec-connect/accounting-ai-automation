@@ -1,0 +1,66 @@
+{
+  "common": {
+    "loading": "Chargement…",
+    "save": "Sauvegarder",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "search": "Rechercher",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "documents": "Documents",
+    "exceptions": "Exceptions",
+    "audit": "Audit",
+    "reports": "Rapports",
+    "search": "Recherche",
+    "settings": "Paramètres",
+    "logout": "Déconnexion"
+  },
+  "documents": {
+    "title": "Documents",
+    "status": {
+      "received": "Reçu",
+      "extracted": "Extrait",
+      "auto_approved": "Auto-approuvé",
+      "exception": "Exception",
+      "approved": "Approuvé",
+      "delivered": "Livré",
+      "rejected": "Rejeté"
+    },
+    "type": {
+      "invoice": "Facture",
+      "quote": "Devis",
+      "delivery_note": "Bon de livraison",
+      "receipt": "Reçu",
+      "other": "Autre"
+    },
+    "upload": "Upload",
+    "refresh": "Rafraîchir",
+    "export": {
+      "excel": "Excel",
+      "pdf": "PDF"
+    }
+  },
+  "exceptions": {
+    "title": "Exceptions",
+    "severity": {
+      "high": "Haute",
+      "medium": "Moyenne",
+      "low": "Basse"
+    },
+    "resolve": "Résoudre",
+    "approve": "Approuver",
+    "reject": "Rejeter"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "confidence": {
+      "title": "Seuil de confiance IA",
+      "threshold": "Seuil d'auto-approbation",
+      "high_severity": "Seuil de sévérité haute"
+    }
+  }
+}

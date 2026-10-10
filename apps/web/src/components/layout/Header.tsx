@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function Header({ title }: { title: string }) {
   const { profile } = useProfile();
@@ -28,6 +29,7 @@ export function Header({ title }: { title: string }) {
         )}
       </div>
       <div className="flex items-center gap-3">
+        <LanguageSwitcher />
         <EnvironmentBadge />
         <UserMenu />
       </div>

@@ -38,17 +38,18 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const isPublic =
-  path === "/" ||
-  path.startsWith("/login") ||
-  path.startsWith("/signup") ||
-  path.startsWith("/api/cron") ||
-  path.startsWith("/api/documents") ||
-  path.startsWith("/api/settings") ||
-  path.startsWith("/api/search") ||
-  path.startsWith("/api/dashboard") ||
-  path.startsWith("/api/inbound-email");
+    path === "/" ||
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/api/cron") ||
+    path.startsWith("/api/documents") ||
+    path.startsWith("/api/settings") ||
+    path.startsWith("/api/search") ||
+    path.startsWith("/api/dashboard") ||
+    path.startsWith("/api/inbound-email") ||
+    path.startsWith("/api/audit") ||
+    path.startsWith("/api/reports");
 
-  // 1. Non authentifie sur page protegee -> /login
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -56,14 +57,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 2. Authentifie sur /login ou /signup -> /dashboard
   if (user && (path === "/login" || path === "/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // 3. Verification admin sur routes sensibles
   if (user && ADMIN_ROUTES.some((route) => path.startsWith(route))) {
     const { data: profile } = await supabase
       .from("profiles")

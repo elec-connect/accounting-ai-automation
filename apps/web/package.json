@@ -2,6 +2,7 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "node --max-old-space-size=8192 node_modules/next/dist/bin/next build",
@@ -19,9 +20,12 @@
     "lucide-react": "^0.453.0",
     "mammoth": "^1.13.0",
     "next": "15.1.11",
+    "next-intl": "^4.14.9",
     "openai": "^7.28.0",
+    "otplib": "^13.5.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
+    "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "recharts": "^3.10.1",
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.0",
@@ -44,6 +49,8 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
       "tesseract.js",
       "esbuild",
       "sharp"

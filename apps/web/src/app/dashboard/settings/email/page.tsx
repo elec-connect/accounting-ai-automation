@@ -5,7 +5,6 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
-import { PipelineModeToggle } from "@/components/settings/PipelineModeToggle";
 
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
@@ -21,6 +20,14 @@ export default function EmailSettingsPage() {
     cron_email_to: "",
     resend_webhook_secret: "",
     resend_inbound_domain: "",
+    // ✨ Relances automatiques
+    reminder_enabled: "false",
+    reminder_days: "3",
+    reminder_max_count: "3",
+    reminder_hour: "8",
+    cron_hour_utc: "7",
+    confidence_threshold: "90",
+    confidence_high_severity: "70",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,7 +55,7 @@ export default function EmailSettingsPage() {
       if (res.ok) {
         setMessage({
           type: "success",
-          text: "✅ Configuration email et cron sauvegardée",
+          text: "✅ Configuration sauvegardée",
         });
       } else {
         setMessage({ type: "error", text: "❌ Erreur de sauvegarde" });
@@ -141,19 +148,63 @@ export default function EmailSettingsPage() {
             <div className="border-b mt-8 mb-8"></div>
 
             {/* ═══════════════════════════════════════════
-                ✨ NOUVELLE SECTION : MODE DE TRAITEMENT
+                 SECTION SEUIL DE CONFIANCE
                 ═══════════════════════════════════════════ */}
-            <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-              🔄 Mode de traitement
-            </h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Choisissez si les documents sont traités automatiquement par l'IA
-              après l'upload ou manuellement à la demande.
-            </p>
+<h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+  🎯 Seuil de confiance IA
+</h3>
+<p className="text-sm text-gray-500 mb-6">
+  Détermine à partir de quel score l'IA approuve automatiquement un document.
+</p>
 
-            <PipelineModeToggle />
+<div className="space-y-4">
+  <div>
+    <label className="block text-sm font-semibold mb-1">
+      Seuil d'auto-approbation (%)
+    </label>
+    <input
+      type="number"
+      min="50"
+      max="100"
+      value={settings.confidence_threshold}
+      onChange={(e) =>
+        setSettings({ ...settings, confidence_threshold: e.target.value })
+      }
+      className="w-full border rounded px-3 py-2"
+    />
+    <p className="text-xs text-gray-500 mt-1">
+      Si le score ≥ cette valeur → auto-approuvé. Sinon → exception.
+    </p>
+  </div>
 
-            <div className="border-b mt-8 mb-8"></div>
+  <div>
+    <label className="block text-sm font-semibold mb-1">
+      Seuil de sévérité "haute" (%)
+    </label>
+    <input
+      type="number"
+      min="0"
+      max="100"
+      value={settings.confidence_high_severity}
+      onChange={(e) =>
+        setSettings({ ...settings, confidence_high_severity: e.target.value })
+      }
+      className="w-full border rounded px-3 py-2"
+    />
+    <p className="text-xs text-gray-500 mt-1">
+      Si le score &lt; cette valeur → exception de sévérité HAUTE.
+    </p>
+  </div>
+
+  <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+    📊 Exemple avec seuil à <strong>{settings.confidence_threshold}%</strong> :
+    <br />• Score 95% → ✅ Auto-approuvé
+    <br />• Score 85% → ⚠️ Exception (sévérité moyenne)
+    <br />• Score 50% → 🔴 Exception (sévérité haute)
+  </div>
+</div>
+
+<div className="border-b mt-8 mb-8"></div>
 
             {/* ═══════════════════════════════════════════
                 SECTION EMAIL
@@ -448,6 +499,114 @@ export default function EmailSettingsPage() {
             </div>
 
             {/* ═══════════════════════════════════════════
+                SECTION RELANCES AUTOMATIQUES
+                ═══════════════════════════════════════════ */}
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+              📧 Relances automatiques
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Relance automatiquement les documents bloqués en exception
+              depuis plusieurs jours. Utile pour ne rien oublier.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="reminder_enabled"
+                  checked={settings.reminder_enabled === "true"}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      reminder_enabled: e.target.checked ? "true" : "false",
+                    })
+                  }
+                  className="w-5 h-5"
+                />
+                <label htmlFor="reminder_enabled" className="font-semibold">
+                  Activer les relances automatiques
+                </label>
+              </div>
+
+              {settings.reminder_enabled === "true" && (
+                <>
+                  {/* ✨ NOUVEAU : Heure de relance */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Heure d'envoi (UTC)
+                    </label>
+                    <select
+                      value={settings.reminder_hour}
+                      onChange={(e) =>
+                        setSettings({ ...settings, reminder_hour: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const h = String(i).padStart(2, "0");
+                        return (
+                          <option key={h} value={h}>
+                            {h}:00 UTC
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Relancer après (jours)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={settings.reminder_days}
+                      onChange={(e) =>
+                        setSettings({ ...settings, reminder_days: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Délai avant la première relance
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Nombre maximum de relances
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={settings.reminder_max_count}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          reminder_max_count: e.target.value,
+                        })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Au-delà, aucune relance ne sera envoyée
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                    ℹ️ Les relances sont envoyées <strong>une fois par jour</strong> via
+                    un cron Vercel. Nécessite que <code>/api/cron/send-reminders</code> existe
+                    et soit configuré dans <code>vercel.json</code>.
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ═══════════════════════════════════════════
                 SECTION CRON
                 ═══════════════════════════════════════════ */}
             <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
@@ -523,7 +682,7 @@ export default function EmailSettingsPage() {
 
                   <div>
                     <label className="block text-sm font-semibold mb-1">
-                      Heure d'envoi
+                      Heure d'envoi (UTC)
                     </label>
                     <select
                       value={settings.cron_hour}
@@ -536,11 +695,14 @@ export default function EmailSettingsPage() {
                         const h = String(i).padStart(2, "0");
                         return (
                           <option key={h} value={h}>
-                            {h}:00
+                            {h}:00 UTC
                           </option>
                         );
                       })}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
+                    </p>
                   </div>
 
                   <div>

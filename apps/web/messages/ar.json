@@ -1,0 +1,66 @@
+{
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "confirm": "تأكيد",
+    "search": "بحث",
+    "yes": "نعم",
+    "no": "لا"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "documents": "المستندات",
+    "exceptions": "الاستثناءات",
+    "audit": "التدقيق",
+    "reports": "التقارير",
+    "search": "بحث",
+    "settings": "الإعدادات",
+    "logout": "تسجيل الخروج"
+  },
+  "documents": {
+    "title": "المستندات",
+    "status": {
+      "received": "مستلم",
+      "extracted": "مستخرج",
+      "auto_approved": "موافقة تلقائية",
+      "exception": "استثناء",
+      "approved": "موافق عليه",
+      "delivered": "تم التسليم",
+      "rejected": "مرفوض"
+    },
+    "type": {
+      "invoice": "فاتورة",
+      "quote": "عرض سعر",
+      "delivery_note": "مذكرة تسليم",
+      "receipt": "إيصال",
+      "other": "أخرى"
+    },
+    "upload": "رفع",
+    "refresh": "تحديث",
+    "export": {
+      "excel": "Excel",
+      "pdf": "PDF"
+    }
+  },
+  "exceptions": {
+    "title": "الاستثناءات",
+    "severity": {
+      "high": "عالية",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    },
+    "resolve": "حل",
+    "approve": "موافقة",
+    "reject": "رفض"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "confidence": {
+      "title": "عتبة ثقة الذكاء الاصطناعي",
+      "threshold": "عتبة الموافقة التلقائية",
+      "high_severity": "عتبة الخطورة العالية"
+    }
+  }
+}

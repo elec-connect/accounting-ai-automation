@@ -26,7 +26,7 @@ export async function GET() {
 
     let totalTtc = 0;
     const byStatus: Record<string, number> = {};
-    const bySupplier: Record<string, number> = {};
+    const bySupplierMap: Record<string, { total: number; count: number }> = {};
     const byMonth: Record<string, number> = {};
 
     for (const doc of documents || []) {
@@ -40,11 +40,13 @@ export async function GET() {
       // Par statut
       byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
 
-      // Par fournisseur
+      // Par fournisseur (compteur + total)
       const supplier = fields.supplier_name || 'Inconnu';
-      if (amount > 0) {
-        bySupplier[supplier] = (bySupplier[supplier] || 0) + amount;
+      if (!bySupplierMap[supplier]) {
+        bySupplierMap[supplier] = { total: 0, count: 0 };
       }
+      bySupplierMap[supplier].total += amount;
+      bySupplierMap[supplier].count += 1;
 
       // Par mois
       const date = new Date(doc.created_at);
@@ -52,17 +54,24 @@ export async function GET() {
       byMonth[monthKey] = (byMonth[monthKey] || 0) + amount;
     }
 
-    // Top 5 fournisseurs
-    const topSuppliers = Object.entries(bySupplier)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, amount]) => ({ name, amount }));
+    // ⭐ Top 5 fournisseurs — au format attendu par le composant
+    const topSuppliers = Object.entries(bySupplierMap)
+      .map(([supplier, data]) => ({
+        supplier,          // ← renommé
+        total: data.total, // ← renommé
+        count: data.count, // ← ajouté
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
 
-    // 6 derniers mois
+    // ⭐ Évolution mensuelle — au format attendu
     const monthlyData = Object.entries(byMonth)
       .sort()
       .slice(-6)
-      .map(([month, amount]) => ({ month, amount }));
+      .map(([month, total]) => ({
+        month,
+        total,  // ← renommé (avant : amount)
+      }));
 
     // Derniers documents
     const recentDocs = (documents || []).slice(0, 5).map((doc) => {
@@ -73,7 +82,7 @@ export async function GET() {
       return {
         id: doc.id,
         filename: doc.original_filename,
-        supplier: fields.supplier_name || '-',
+        supplier: fields.supplier_name || 'Inconnu',
         amount: parseFloat(fields.total_amount_ttc || '0') || 0,
         status: doc.status,
         created_at: doc.created_at,
@@ -83,10 +92,12 @@ export async function GET() {
     return NextResponse.json({
       totalDocuments: (documents || []).length,
       totalTtc,
-      totalExtracted: byStatus['extracted'] || 0,
-      totalPending: (documents || []).filter(
-        (d) => d.status === 'received'
-      ).length,
+      totalExtracted:
+        (byStatus['extracted'] || 0) +
+        (byStatus['auto_approved'] || 0) +
+        (byStatus['approved'] || 0) +
+        (byStatus['delivered'] || 0),
+      totalPending: byStatus['received'] || 0,
       byStatus,
       topSuppliers,
       monthlyData,

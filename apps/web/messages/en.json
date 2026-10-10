@@ -1,0 +1,66 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "search": "Search",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "documents": "Documents",
+    "exceptions": "Exceptions",
+    "audit": "Audit",
+    "reports": "Reports",
+    "search": "Search",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "documents": {
+    "title": "Documents",
+    "status": {
+      "received": "Received",
+      "extracted": "Extracted",
+      "auto_approved": "Auto-approved",
+      "exception": "Exception",
+      "approved": "Approved",
+      "delivered": "Delivered",
+      "rejected": "Rejected"
+    },
+    "type": {
+      "invoice": "Invoice",
+      "quote": "Quote",
+      "delivery_note": "Delivery note",
+      "receipt": "Receipt",
+      "other": "Other"
+    },
+    "upload": "Upload",
+    "refresh": "Refresh",
+    "export": {
+      "excel": "Excel",
+      "pdf": "PDF"
+    }
+  },
+  "exceptions": {
+    "title": "Exceptions",
+    "severity": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "resolve": "Resolve",
+    "approve": "Approve",
+    "reject": "Reject"
+  },
+  "settings": {
+    "title": "Settings",
+    "confidence": {
+      "title": "AI Confidence Threshold",
+      "threshold": "Auto-approval threshold",
+      "high_severity": "High severity threshold"
+    }
+  }
+}

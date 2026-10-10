@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/lib/auth/use-profile";
 import { can } from "@/lib/auth/permissions";
+import { EditableFields } from "./EditableFields";
 
 type DocumentRow = {
   id: string;
@@ -15,6 +16,7 @@ type DocumentRow = {
   content_type: string | null;
   storage_path: string;
   status: string;
+  type: string;
   summary: string | null;
   raw_text: string | null;
   confidence_score: number | null;
@@ -30,6 +32,22 @@ type ExtractionRow = {
   extracted_fields: Record<string, unknown>;
   confidence: number | null;
   warnings: unknown[] | null;
+  suggestions: unknown[] | null;
+};
+
+type Suggestion = {
+  field: string;
+  current_value: unknown;
+  suggested_value: unknown;
+  reason: string;
+};
+
+const TYPE_LABELS: Record<string, { label: string; icon: string }> = {
+  invoice: { label: "Facture", icon: "🧾" },
+  quote: { label: "Devis", icon: "📝" },
+  delivery_note: { label: "Bon de livraison", icon: "📦" },
+  receipt: { label: "Reçu", icon: "🧾" },
+  other: { label: "Autre", icon: "📄" },
 };
 
 export function DocumentDetail({ documentId }: { documentId: string }) {
@@ -115,8 +133,40 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erreur");
 
-      // Recharger les données après un délai (le pipeline tourne en async)
+      // Recharger après un délai (pipeline async)
       setTimeout(() => load(), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  ✨ NOUVEAU : Reprocesser (relancer l'IA)
+  // ═══════════════════════════════════════════════════════════
+  async function handleReprocess() {
+    if (
+      !confirm(
+        "Relancer l'extraction IA ?\n\nCela va :\n• Supprimer l'extraction actuelle\n• Supprimer les exceptions liées\n• Refaire l'analyse complète"
+      )
+    ) {
+      return;
+    }
+
+    setWorking(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/documents/${documentId}/reprocess`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur");
+
+      // Recharger après 30 secondes (le pipeline tourne en async)
+      alert("✅ Retraitement lancé. Rechargement dans 30 secondes…");
+      setTimeout(() => load(), 30_000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -128,6 +178,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
   if (!doc) return <p className="text-red-500">Document introuvable.</p>;
 
   const confidence = doc.confidence_score;
+  const typeConfig = TYPE_LABELS[doc.type] || TYPE_LABELS.other;
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -139,6 +190,13 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="info">{doc.status}</Badge>
+
+            {/* Type détecté */}
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700">
+              {typeConfig.icon} {typeConfig.label}
+            </span>
+
+            {/* Score de confiance */}
             {confidence != null && (
               <span
                 className={`text-xs font-semibold px-2 py-1 rounded-full ${
@@ -158,7 +216,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
         {/* Boutons d'action */}
         {canAct && (
           <div className="flex gap-2 flex-wrap">
-            {/* Bouton "Traiter maintenant" si en received */}
+            {/* Traiter maintenant si en received */}
             {doc.status === "received" && (
               <Button
                 onClick={handleProcess}
@@ -166,6 +224,18 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {working ? "…" : "▶️ Traiter maintenant"}
+              </Button>
+            )}
+
+            {/* ✨ NOUVEAU : Reprocesser (relancer l'IA) */}
+            {["exception", "extracted", "auto_approved", "approved", "rejected"].includes(doc.status) && (
+              <Button
+                onClick={handleReprocess}
+                disabled={working}
+                className="bg-orange-600 hover:bg-orange-700"
+                title="Relancer l'extraction IA sur ce document"
+              >
+                {working ? "…" : "🔄 Reprocesser"}
               </Button>
             )}
 
@@ -263,24 +333,62 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
             </Card>
           )}
 
+          {/* ✨ Suggestions IA */}
+          {extraction?.suggestions &&
+            Array.isArray(extraction.suggestions) &&
+            extraction.suggestions.length > 0 && (
+              <Card className="p-4 border-blue-200 bg-blue-50">
+                <h2 className="font-semibold mb-3 text-blue-800">
+                  💡 Suggestions de l'IA
+                </h2>
+                <div className="space-y-3">
+                  {(extraction.suggestions as Suggestion[]).map((s, i) => (
+                    <div
+                      key={i}
+                      className="p-3 bg-white rounded border border-blue-100"
+                    >
+                      <p className="text-xs font-mono text-blue-900 mb-1">
+                        {s.field}
+                      </p>
+                      <div className="text-sm flex items-center gap-2 flex-wrap">
+                        <span className="text-red-600 line-through">
+                          {String(s.current_value ?? "null")}
+                        </span>
+                        <span className="text-gray-400">→</span>
+                        <span className="text-green-700 font-semibold">
+                          {String(s.suggested_value ?? "null")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700 mt-1">{s.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+          {/* ⚠️ Warnings IA */}
+          {extraction?.warnings &&
+            Array.isArray(extraction.warnings) &&
+            extraction.warnings.length > 0 && (
+              <Card className="p-4 border-yellow-200 bg-yellow-50">
+                <h2 className="font-semibold mb-2 text-yellow-800">
+                  ⚠️ Avertissements IA
+                </h2>
+                <ul className="text-xs text-yellow-900 list-disc list-inside space-y-1">
+                  {extraction.warnings.map((w, i) => (
+                    <li key={i}>{String(w)}</li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+          {/* ✨ Champs éditables */}
           {extraction?.extracted_fields && (
-            <Card className="p-4">
-              <h2 className="font-semibold mb-3">🤖 Champs extraits</h2>
-              <dl className="text-sm space-y-2">
-                {Object.entries(extraction.extracted_fields).map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-4">
-                    <dt className="text-gray-500 font-mono text-xs">{k}</dt>
-                    <dd className="text-right break-all">
-                      {v == null ? (
-                        <span className="text-red-500">null</span>
-                      ) : (
-                        String(v)
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Card>
+            <EditableFields
+              documentId={documentId}
+              extractionId={extraction.id}
+              initialFields={extraction.extracted_fields}
+            />
           )}
 
           {doc.raw_text && (

@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { sendExceptionEmail } from '@/lib/email/send-exception-email';
 import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // ═══════════════════════════════════════════════════════════════
-//  CONFIGURATION
+//  SEUILS PAR DÉFAUT (surchargés par les settings en DB)
 // ═══════════════════════════════════════════════════════════════
 
-const CONFIDENCE_THRESHOLD = 90;
-const SEVERITY_HIGH_THRESHOLD = 70;
+const DEFAULT_CONFIDENCE_THRESHOLD = 90;
+const DEFAULT_SEVERITY_HIGH_THRESHOLD = 70;
 
 // ═══════════════════════════════════════════════════════════════
 //  ROUTE PRINCIPALE
@@ -34,9 +35,37 @@ export async function POST(
 
     console.log('=== EXTRACT: ID ===', id);
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
-    // 1. Charger le document
+    // ─────────────────────────────────────────────────────────
+    //  0. Charger les seuils depuis settings
+    // ─────────────────────────────────────────────────────────
+    const { data: thresholdSettings } = await supabase
+      .from('settings')
+      .select('key, value')
+      .in('key', ['confidence_threshold', 'confidence_high_severity']);
+
+    const thresholds: Record<string, string> = {};
+    for (const row of thresholdSettings ?? []) {
+      thresholds[row.key] = row.value ?? '';
+    }
+
+    const CONFIDENCE_THRESHOLD = parseInt(
+      thresholds.confidence_threshold || String(DEFAULT_CONFIDENCE_THRESHOLD),
+      10
+    );
+    const SEVERITY_HIGH_THRESHOLD = parseInt(
+      thresholds.confidence_high_severity || String(DEFAULT_SEVERITY_HIGH_THRESHOLD),
+      10
+    );
+
+    console.log(
+      `Thresholds: confidence=${CONFIDENCE_THRESHOLD}, high=${SEVERITY_HIGH_THRESHOLD}`
+    );
+
+    // ─────────────────────────────────────────────────────────
+    //  1. Charger le document
+    // ─────────────────────────────────────────────────────────
     const { data: doc, error: docError } = await supabase
       .from('documents')
       .select('*')
@@ -51,7 +80,9 @@ export async function POST(
       );
     }
 
-    // 2. Vérifier si une extraction existe déjà
+    // ─────────────────────────────────────────────────────────
+    //  2. Vérifier si une extraction existe déjà
+    // ─────────────────────────────────────────────────────────
     const { data: existing } = await supabase
       .from('extractions')
       .select('*')
@@ -80,7 +111,9 @@ export async function POST(
       });
     }
 
-    // 3. Télécharger le fichier
+    // ─────────────────────────────────────────────────────────
+    //  3. Télécharger le fichier
+    // ─────────────────────────────────────────────────────────
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('documents')
       .download(doc.storage_path);
@@ -101,7 +134,9 @@ export async function POST(
     const fileName = String(doc.original_filename || '').toLowerCase();
     let rawText = '';
 
-    // 4. Extraire le texte selon le format
+    // ─────────────────────────────────────────────────────────
+    //  4. Extraire le texte selon le format
+    // ─────────────────────────────────────────────────────────
     if (fileName.endsWith('.pdf')) {
       console.log('Parsing PDF with unpdf...');
       const { extractText } = await import('unpdf');
@@ -154,7 +189,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'Le format .doc n’est pas pris en charge. Convertissez le document en .docx.',
+            'Le format .doc n\u2019est pas pris en charge. Convertissez le document en .docx.',
         },
         { status: 400 }
       );
@@ -175,13 +210,15 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'Aucun texte n’a pu être extrait. Vérifiez que le document contient du texte lisible.',
+            'Aucun texte n\u2019a pu être extrait. Vérifiez que le document contient du texte lisible.',
         },
         { status: 422 }
       );
     }
 
-    // 5. Configurer Groq
+    // ─────────────────────────────────────────────────────────
+    //  5. Configurer Groq
+    // ─────────────────────────────────────────────────────────
     const groqKey = process.env.GROQ_API_KEY;
 
     if (!groqKey) {
@@ -204,20 +241,23 @@ export async function POST(
 
     const model = 'openai/gpt-oss-120b';
 
-    // 6. ✨ NOUVEAU PROMPT avec score de confiance
+    // ─────────────────────────────────────────────────────────
+    //  6. Prompt avec type + score + suggestions
+    // ─────────────────────────────────────────────────────────
     const completion = await openai.chat.completions.create({
       model,
       messages: [
         {
           role: 'system',
           content:
-            'Tu es un assistant comptable expert. Analyse les factures et bons de livraison. Retourne UNIQUEMENT un objet JSON valide. N’invente AUCUNE donnée : utilise null si une information est absente. Évalue honnêtement ta confiance.',
+            'Tu es un assistant comptable expert. Analyse les documents comptables. Retourne UNIQUEMENT un objet JSON valide. N\u2019invente AUCUNE donnée : utilise null si une information est absente. Évalue honnêtement ta confiance.',
         },
         {
           role: 'user',
           content: `Analyse ce document et retourne un JSON avec cette structure EXACTE :
 
 {
+  "type": "invoice" | "quote" | "delivery_note" | "receipt" | "other",
   "extracted": {
     "invoice_number": "...",
     "invoice_date": "YYYY-MM-DD",
@@ -239,22 +279,31 @@ export async function POST(
     "supplier_name": { "score": 0-100, "reason": "..." },
     "total_amount_ttc": { "score": 0-100, "reason": "..." }
   },
-  "warnings": ["..."]
+  "warnings": ["..."],
+  "suggestions": [
+    {
+      "field": "total_amount_ttc",
+      "current_value": 599.00,
+      "suggested_value": 599.00,
+      "reason": "..."
+    }
+  ]
 }
+
+DÉTECTION DU TYPE (champ "type") :
+- "invoice" : Facture (mots-clés : "facture", "invoice", "montant total", "TVA")
+- "quote" : Devis (mots-clés : "devis", "quote", "proposition", "estimation")
+- "delivery_note" : Bon de livraison ("bon de livraison", "delivery note", "BL")
+- "receipt" : Reçu ("reçu", "receipt", "ticket")
+- "other" : Tout autre document
 
 RÈGLES DE SCORING (confidence global 0-100) :
 - 95-100 : tous les champs critiques présents, montants cohérents, document net
 - 80-94  : champs présents mais un doute léger sur un montant ou une date
-- 60-79  : plusieurs champs manquants ou ambigus, nécessite une relecture
-- 0-59   : document non exploitable (texte illisible, structure inconnue, page blanche)
+- 60-79  : plusieurs champs manquants ou ambigus
+- 0-59   : document non exploitable
 
-DÉTAILS (confidence_details) : pour chaque champ critique, donne :
-- "score" : ta confiance dans CE champ spécifique (0-100)
-- "reason" : explication courte si score < 90
-
-WARNINGS : liste des problèmes détectés (ex: "Montant HT et TTC incohérents", "Date non trouvée")
-
-Si un champ est null, mets-lui un score très bas (ex: 20) avec une raison claire.
+SUGGESTIONS : pour chaque champ dont le score est < 90, propose une valeur corrigée si tu détectes une erreur probable. Si aucune suggestion, retourne un tableau vide [].
 
 Texte du document :
 ${rawText.slice(0, 8000)}`,
@@ -270,12 +319,16 @@ ${rawText.slice(0, 8000)}`,
       throw new Error('Le modèle IA a retourné une réponse vide.');
     }
 
-    // 7. Parser la réponse
+    // ─────────────────────────────────────────────────────────
+    //  7. Parser la réponse
+    // ─────────────────────────────────────────────────────────
     let parsed: {
+      type?: string;
       extracted?: Record<string, unknown>;
       confidence?: number;
       confidence_details?: Record<string, unknown>;
       warnings?: string[];
+      suggestions?: unknown[];
     };
 
     try {
@@ -284,58 +337,117 @@ ${rawText.slice(0, 8000)}`,
       throw new Error('Le modèle IA a retourné un JSON invalide.');
     }
 
-    // Compatibilité : si l'IA renvoie les champs à la racine, on les récupère
     const extractedFields = (parsed.extracted ?? parsed) as Record<string, unknown>;
 
     const confidenceScore =
-      typeof parsed.confidence === 'number' && parsed.confidence >= 0 && parsed.confidence <= 100
+      typeof parsed.confidence === 'number' &&
+      parsed.confidence >= 0 &&
+      parsed.confidence <= 100
         ? parsed.confidence
-        : 50; // Score par défaut prudent si l'IA oublie de le fournir
+        : 50;
 
     const confidenceDetails = parsed.confidence_details ?? {};
     const warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const detectedType = (parsed.type as string) || 'other';
 
     console.log('AI response received. Confidence:', confidenceScore);
+    console.log('Detected type:', detectedType);
+    console.log('Suggestions:', suggestions.length);
 
-    // 8. Enregistrer l'extraction avec le VRAI score
+    // ─────────────────────────────────────────────────────────
+    //  8. Enregistrer l'extraction
+    // ─────────────────────────────────────────────────────────
     const { data: extraction, error: insertError } = await supabase
       .from('extractions')
       .insert({
         document_id: id,
         extracted_fields: extractedFields,
-        confidence: confidenceScore / 100, // 0.87 pour 87%
+        confidence: confidenceScore / 100,
         confidence_details: confidenceDetails,
         warnings: warnings,
+        suggestions: suggestions,
         model_used: model,
-        prompt_version: 'v2',
+        prompt_version: 'v3',
       })
       .select()
       .single();
 
     if (insertError || !extraction) {
-      console.error('Erreur d’enregistrement de l’extraction:', insertError?.message);
+      console.error('Erreur d\u2019enregistrement de l\u2019extraction:', insertError?.message);
       return NextResponse.json(
         {
           error:
-            'Impossible d’enregistrer l’extraction : ' +
+            'Impossible d\u2019enregistrer l\u2019extraction : ' +
             (insertError?.message || 'erreur inconnue'),
         },
         { status: 500 }
       );
     }
 
-    // 9. ✨ DÉCISION AUTOMATIQUE selon le seuil
-    const shouldCreateException = confidenceScore < CONFIDENCE_THRESHOLD;
-    const newStatus = shouldCreateException ? 'exception' : 'auto_approved';
+    // ─────────────────────────────────────────────────────────
+    //  9. Décision automatique
+    // ─────────────────────────────────────────────────────────
+    let shouldCreateException = confidenceScore < CONFIDENCE_THRESHOLD;
+    let newStatus = shouldCreateException ? 'exception' : 'auto_approved';
+    let exceptionReason = `Confiance IA faible (${confidenceScore.toFixed(0)}% < ${CONFIDENCE_THRESHOLD}%)`;
+
+    // ─────────────────────────────────────────────────────────
+    //  10. Détection de doublons
+    // ─────────────────────────────────────────────────────────
+    try {
+      const appUrl = (
+        process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+      ).replace(/\/+$/, '');
+
+      const dupRes = await fetch(`${appUrl}/api/documents/check-duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_number: extractedFields.invoice_number,
+          supplier_name: extractedFields.supplier_name,
+          total_amount_ttc: extractedFields.total_amount_ttc,
+          invoice_date: extractedFields.invoice_date,
+          exclude_id: id,
+        }),
+      });
+
+      const dupData = await dupRes.json();
+
+      if (dupData.duplicate && dupData.matches?.length > 0) {
+        const names = dupData.matches
+          .map((m: { original_filename: string }) => m.original_filename)
+          .join(', ');
+
+        warnings.push(`⚠️ Doublon potentiel avec : ${names}`);
+
+        shouldCreateException = true;
+        newStatus = 'exception';
+        exceptionReason = `Doublon potentiel détecté (${dupData.matches.length} correspondance(s))`;
+
+        console.log('⚠️ Doublon détecté:', names);
+
+        await supabase
+          .from('extractions')
+          .update({ warnings })
+          .eq('document_id', id);
+      }
+    } catch (dupErr) {
+      console.error('Duplicate check failed:', dupErr);
+    }
 
     console.log(
       `Decision: score=${confidenceScore}, status=${newStatus}, exception=${shouldCreateException}`
     );
 
+    // ─────────────────────────────────────────────────────────
+    //  11. Mettre à jour le document
+    // ─────────────────────────────────────────────────────────
     const { error: updateError } = await supabase
       .from('documents')
       .update({
         status: newStatus,
+        type: detectedType,
         raw_text: rawText.slice(0, 50000),
         confidence_score: confidenceScore,
       })
@@ -345,7 +457,9 @@ ${rawText.slice(0, 8000)}`,
       console.error('Erreur de mise à jour du document:', updateError.message);
     }
 
-    // 10. ✨ CRÉATION AUTOMATIQUE D'EXCEPTION si nécessaire
+    // ─────────────────────────────────────────────────────────
+    //  12. Création auto d'exception
+    // ─────────────────────────────────────────────────────────
     if (shouldCreateException) {
       const severity =
         confidenceScore < SEVERITY_HIGH_THRESHOLD ? 'high' : 'medium';
@@ -354,22 +468,29 @@ ${rawText.slice(0, 8000)}`,
         .from('exceptions')
         .insert({
           document_id: id,
-          reason: `Confiance IA faible (${confidenceScore.toFixed(0)}% < ${CONFIDENCE_THRESHOLD}%)`,
+          reason: exceptionReason,
           severity: severity,
           status: 'open',
         });
 
       if (exceptionError) {
-        console.error(
-          'Erreur de création de l’exception:',
-          exceptionError.message
-        );
+        console.error('Erreur de création de l\u2019exception:', exceptionError.message);
       } else {
         console.log('✅ Exception créée automatiquement');
+
+        sendExceptionEmail({
+          documentId: id,
+          filename: doc.original_filename || 'Document',
+          reason: exceptionReason,
+          score: confidenceScore,
+          severity,
+        }).catch((err) => console.error('Email send failed:', err));
       }
     }
 
-    // 11. Générer le résumé
+    // ─────────────────────────────────────────────────────────
+    //  13. Générer le résumé
+    // ─────────────────────────────────────────────────────────
     const summaryResult = await generateSummary(request, id);
 
     if (summaryResult.success) {
@@ -385,6 +506,7 @@ ${rawText.slice(0, 8000)}`,
       extraction,
       confidence: confidenceScore,
       status: newStatus,
+      type: detectedType,
       exceptionCreated: shouldCreateException,
       summary: summaryResult.summary ?? null,
       summaryGenerated: summaryResult.success,
@@ -456,7 +578,7 @@ async function generateSummary(
     if (!response.ok || !result.success) {
       const errorMessage =
         result.error ||
-        `L’API de résumé a répondu avec le statut ${response.status}.`;
+        `L\u2019API de résumé a répondu avec le statut ${response.status}.`;
 
       console.error('Summary API failed:', errorMessage);
 

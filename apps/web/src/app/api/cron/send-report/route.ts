@@ -35,9 +35,10 @@ export async function GET(request: Request) {
 
     // 4. Vérifier si c'est le bon moment
     const now = new Date();
-    const currentHour = String(now.getHours()).padStart(2, '0');
-    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-    const currentDate = now.getDate();
+    const currentHour = String(now.getUTCHours()).padStart(2, '0');
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = dayNames[now.getUTCDay()];
+    const currentDate = now.getUTCDate();
 
     const targetHour = settings.cron_hour || '09';
 
