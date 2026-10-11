@@ -1,10 +1,33 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+// ═══════════════════════════════════════════════════════════════
+//  ROUTES PROTÉGÉES
+// ═══════════════════════════════════════════════════════════════
+
 const ADMIN_ROUTES = [
   "/dashboard/audit",
   "/dashboard/settings/users",
   "/dashboard/settings/email",
+];
+
+const SUPER_ADMIN_ROUTES = [
+  "/super-admin",
+  "/api/super-admin",
+];
+
+const PUBLIC_ROUTES = [
+  "/",
+  "/login",
+  "/signup",
+  "/api/cron",
+  "/api/documents",
+  "/api/settings",
+  "/api/search",
+  "/api/dashboard",
+  "/api/inbound-email",
+  "/api/audit",
+  "/api/reports",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -37,18 +60,13 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  const isPublic =
-    path === "/" ||
-    path.startsWith("/login") ||
-    path.startsWith("/signup") ||
-    path.startsWith("/api/cron") ||
-    path.startsWith("/api/documents") ||
-    path.startsWith("/api/settings") ||
-    path.startsWith("/api/search") ||
-    path.startsWith("/api/dashboard") ||
-    path.startsWith("/api/inbound-email") ||
-    path.startsWith("/api/audit") ||
-    path.startsWith("/api/reports");
+  // ═══════════════════════════════════════════════════════════════
+  //  ROUTES PUBLIQUES
+  // ═══════════════════════════════════════════════════════════════
+
+  const isPublic = PUBLIC_ROUTES.some(
+    (route) => path === route || path.startsWith(route + "/")
+  );
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
@@ -57,11 +75,47 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  REDIRECTION APRÈS LOGIN (⭐ MODIFIÉ)
+  //  - Super-admin → /super-admin/licenses
+  //  - Autres users → /dashboard
+  // ═══════════════════════════════════════════════════════════════
+
   if (user && (path === "/login" || path === "/signup")) {
+    // Vérifier si super-admin
+    const { data: superAdmin } = await supabase
+      .from("super_admins")
+      .select("email")
+      .eq("email", user.email)
+      .maybeSingle();
+
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = superAdmin ? "/super-admin/licenses" : "/dashboard";
     return NextResponse.redirect(url);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  SUPER ADMIN — protection des routes /super-admin et /api/super-admin
+  // ═══════════════════════════════════════════════════════════════
+
+  if (user && SUPER_ADMIN_ROUTES.some((route) => path.startsWith(route))) {
+    const { data: superAdmin } = await supabase
+      .from("super_admins")
+      .select("email")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    if (!superAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.searchParams.set("error", "forbidden");
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ADMIN (accepte admin ET super_admin)
+  // ═══════════════════════════════════════════════════════════════
 
   if (user && ADMIN_ROUTES.some((route) => path.startsWith(route))) {
     const { data: profile } = await supabase
@@ -70,7 +124,11 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (!profile || profile.role !== "admin" || !profile.is_active) {
+    // ⭐ Accepter admin ET super_admin
+    const isAdmin =
+      profile?.role === "admin" || profile?.role === "super_admin";
+
+    if (!profile || !isAdmin || !profile.is_active) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       url.searchParams.set("error", "forbidden");

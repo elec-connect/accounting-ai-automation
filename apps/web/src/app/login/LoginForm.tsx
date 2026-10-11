@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  const redirect = searchParams.get('redirect');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,19 +19,31 @@ export function LoginForm() {
     setError(null);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     });
 
-    if (authError) {
-      setError(authError.message);
+    if (authError || !data.user) {
+      setError(authError?.message ?? 'Erreur de connexion');
       setLoading(false);
       return;
     }
 
-    router.push(redirect);
-    router.refresh();
+    // ⭐ Vérifier si super-admin
+    const { data: superAdmin } = await supabase
+      .from('super_admins')
+      .select('email')
+      .eq('email', data.user.email)
+      .maybeSingle();
+
+    // ⭐ Redirection intelligente
+    const target = superAdmin
+      ? '/super-admin/licenses'
+      : redirect || '/dashboard';
+
+    // ⭐ window.location.href force le passage par le middleware
+    window.location.href = target;
   }
 
   return (

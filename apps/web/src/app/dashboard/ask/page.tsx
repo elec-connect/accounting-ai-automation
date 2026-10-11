@@ -1,8 +1,6 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,42 +28,36 @@ export default function AskPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1">
-        <Header title="Ask about your documents" />
-        <main className="p-8 max-w-4xl space-y-6">
-          <Card>
-            <div className="flex gap-3">
-              <Input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="e.g. What invoices over £5,000 did we receive?"
-                onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-              />
-              <Button onClick={handleAsk} disabled={loading}>
-                {loading ? "Thinking..." : "Ask"}
-              </Button>
-            </div>
-            <p className="mt-3 text-sm text-gray-500">
-              Examples: "What invoices over £5,000 in October?" · "Show me exceptions"
-            </p>
-          </Card>
+    <main className="p-8 max-w-4xl space-y-6">
+      <Card>
+        <div className="flex gap-3">
+          <Input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g. What invoices over £5,000 did we receive?"
+            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+          />
+          <Button onClick={handleAsk} disabled={loading}>
+            {loading ? "Thinking..." : "Ask"}
+          </Button>
+        </div>
+        <p className="mt-3 text-sm text-gray-500">
+          Examples: "What invoices over £5,000 in October?" · "Show me exceptions"
+        </p>
+      </Card>
 
-          {answer && (
-            <Card>
-              <h2 className="text-lg font-bold mb-4">Answer</h2>
-              <p className="whitespace-pre-wrap mb-4">{answer.answer}</p>
-              {answer.confidence !== undefined && (
-                <p className="text-xs text-gray-500">
-                  Confidence: {((answer.confidence || 0) * 100).toFixed(0)}% ·
-                  Model: {answer.model_used || "-"}
-                </p>
-              )}
-            </Card>
+      {answer && (
+        <Card>
+          <h2 className="text-lg font-bold mb-4">Answer</h2>
+          <p className="whitespace-pre-wrap mb-4">{answer.answer}</p>
+          {answer.confidence !== undefined && (
+            <p className="text-xs text-gray-500">
+              Confidence: {((answer.confidence || 0) * 100).toFixed(0)}% ·
+              Model: {answer.model_used || "-"}
+            </p>
           )}
-        </main>
-      </div>
-    </div>
+        </Card>
+      )}
+    </main>
   );
 }
