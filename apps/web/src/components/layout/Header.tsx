@@ -7,13 +7,13 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
-export function Header({ title }: { title: string }) {
+export function Header({ title }: { title?: string }) {
   const { profile } = useProfile();
 
   return (
     <header className="border-b bg-white px-8 py-4 flex justify-between items-center">
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold">{title}</h1>
+        {title && <h1 className="text-2xl font-bold">{title}</h1>}
         {profile && (
           <Badge
             variant={
