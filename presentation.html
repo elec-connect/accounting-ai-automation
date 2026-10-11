@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accounting AI Automation — L'IA au service de votre comptabilité</title>
+  <meta name="description" content="Automatisez le traitement de vos factures avec l'intelligence artificielle. Extraction, vérification et comptabilisation en quelques secondes.">
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       RESET & BASE
+       ═══════════════════════════════════════════════════════════ */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1e40af;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f8fafc;
+      --white: #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.6;
+      color: var(--dark);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    /* ═══════════════════════════════════════════════════════════
+       ANIMATIONS
+       ═══════════════════════════════════════════════════════════ */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes shine {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+
+    .animate { opacity: 0; animation: fadeInUp 0.8s ease forwards; }
+    .animate-delay-1 { animation-delay: 0.2s; }
+    .animate-delay-2 { animation-delay: 0.4s; }
+    .animate-delay-3 { animation-delay: 0.6s; }
+    .animate-delay-4 { animation-delay: 0.8s; }
+
+    /* ═══════════════════════════════════════════════════════════
+       NAVIGATION
+       ═══════════════════════════════════════════════════════════ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 800;
+      font-size: 1.25rem;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--gray);
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--primary); }
+
+    .cta-nav {
+      padding: 0.6rem 1.5rem;
+      background: var(--primary);
+      color: white !important;
+      border-radius: 999px;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .cta-nav:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════════════════════ */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.5;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .hero::before {
+      width: 500px;
+      height: 500px;
+      background: rgba(37, 99, 235, 0.3);
+      top: -200px;
+      left: -200px;
+    }
+
+    .hero::after {
+      width: 400px;
+      height: 400px;
+      background: rgba(16, 185, 129, 0.3);
+      bottom: -150px;
+      right: -150px;
+      animation-delay: 2s;
+    }
+
+    .hero-content {
+      max-width: 1200px;
+      width: 100%;
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: white;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--gray);
+      margin-bottom: 2rem;
+      max-width: 500px;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.9rem 2rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.45);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--dark);
+      border: 2px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--gray);
+      margin-top: 0.25rem;
+    }
+
+    /* Mockup */
+    .hero-mockup {
+      position: relative;
+    }
+
+    .mockup-card {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+      transform: perspective(1000px) rotateY(-10deg) rotateX(5deg);
+      transition: transform 0.5s;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .mockup-card:hover {
+      transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+    }
+
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--light);
+    }
+
+    .mockup-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .mockup-dot.red { background: #ef4444; }
+    .mockup-dot.yellow { background: #f59e0b; }
+    .mockup-dot.green { background: #10b981; }
+
+    .mockup-invoice {
+      background: var(--light);
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .mockup-invoice-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .mockup-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.25rem;
+    }
+
+    .mockup-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mockup-filename {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .mockup-supplier {
+      font-size: 0.75rem;
+      color: var(--gray);
+    }
+
+    .mockup-amount {
+      font-weight: 800;
+      color: var(--primary);
+      font-size: 1rem;
+    }
+
+    .mockup-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+    }
+
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-info { background: #dbeafe; color: #1e40af; }
+
+    /* ═══════════════════════════════════════════════════════════
+       SECTIONS COMMUNES
+       ═══════════════════════════════════════════════════════════ */
+    section {
+      padding: 6rem 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .section-subtitle {
+      font-size: 1.15rem;
+      color: var(--gray);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEATURES
+       ═══════════════════════════════════════════════════════════ */
+    .features {
+      background: var(--light);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+
+    .feature-card {
+      background: white;
+      padding: 2rem;
+      border-radius: 20px;
+      transition: all 0.3s;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      border-color: var(--primary);
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      margin-bottom: 1.5rem;
+      color: white;
+    }
+
+    .feature-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-desc {
+      color: var(--gray);
+      font-size: 0.95rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HOW IT WORKS
+       ═══════════════════════════════════════════════════════════ */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+      position: relative;
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+    }
+
+    .step-number {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin: 0 auto 1.5rem;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+    }
+
+    .step-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .step-desc {
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PRICING
+       ═══════════════════════════════════════════════════════════ */
+    .pricing {
+      background: var(--light);
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .price-card {
+      background: white;
+      padding: 2.5rem 2rem;
+      border-radius: 24px;
+      border: 2px solid transparent;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .price-card.featured {
+      border-color: var(--primary);
+      transform: scale(1.05);
+      box-shadow: 0 20px 60px rgba(37, 99, 235, 0.2);
+    }
+
+    .price-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--primary);
+      color: white;
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .price-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .price-value {
+      font-size: 3rem;
+      font-weight: 900;
+      color: var(--primary);
+      margin: 1rem 0 0.25rem;
+      line-height: 1;
+    }
+
+    .price-period {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    .price-features {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+
+    .price-features li {
+      padding: 0.6rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .price-features li::before {
+      content: "✓";
+      display: inline-flex;
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      color: white;
+      border-radius: 50%;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       CTA FINAL
+       ═══════════════════════════════════════════════════════════ */
+    .cta-final {
+      background: linear-gradient(135deg, var(--dark) 0%, #1e293b 100%);
+      color: white;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-final::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, transparent 70%);
+      animation: float 10s ease-in-out infinite;
+    }
+
+    .cta-final .container {
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-final .section-title {
+      color: white;
+    }
+
+    .cta-final .section-subtitle {
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 3rem;
+    }
+
+    .btn-white {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-white:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ */
+    footer {
+      background: var(--dark);
+      color: rgba(255, 255, 255, 0.6);
+      padding: 3rem 2rem 2rem;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    footer .logo {
+      justify-content: center;
+      color: white;
+      margin-bottom: 1rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .hero-content {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+        text-align: center;
+      }
+
+      .hero-subtitle { margin-left: auto; margin-right: auto; }
+      .hero-ctas { justify-content: center; }
+      .hero-stats { justify-content: center; }
+
+      .nav-links { display: none; }
+    }
+
+    @media (max-width: 600px) {
+      section { padding: 4rem 1.5rem; }
+      nav { padding: 1rem; }
+      .hero { padding: 6rem 1.5rem 3rem; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SCROLL REVEAL
+       ═══════════════════════════════════════════════════════════ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.8s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       NAVIGATION
+       ═══════════════════════════════════════════════════════════ -->
+  <nav>
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <span>Accounting AI</span>
+    </div>
+    <div class="nav-links">
+      <a href="#features">Fonctionnalités</a>
+      <a href="#how">Comment ça marche</a>
+      <a href="#pricing">Tarifs</a>
+      <a href="/login" class="cta-nav">Se connecter</a>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-content">
+      <div>
+        <div class="badge animate">
+          <span class="badge-dot"></span>
+          Propulsé par l'IA — Groq Llama 3.3
+        </div>
+
+        <h1 class="animate animate-delay-1">
+          Votre comptabilité<br>
+          <span class="gradient-text">automatisée par l'IA</span>
+        </h1>
+
+        <p class="hero-subtitle animate animate-delay-2">
+          Oubliez la saisie manuelle. Notre IA extrait, vérifie et classe vos factures en quelques secondes, 24h/24.
+        </p>
+
+        <div class="hero-ctas animate animate-delay-3">
+          <a href="/signup" class="btn btn-primary">
+            🚀 Essayer gratuitement
+          </a>
+          <a href="#how" class="btn btn-secondary">
+            Voir la démo
+          </a>
+        </div>
+
+        <div class="hero-stats animate animate-delay-4">
+          <div class="stat">
+            <span class="stat-value">99%</span>
+            <span class="stat-label">Précision IA</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">&lt;5s</span>
+            <span class="stat-label">Par facture</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">24/7</span>
+            <span class="stat-label">Disponible</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mockup -->
+      <div class="hero-mockup animate animate-delay-2">
+        <div class="mockup-card">
+          <div class="mockup-header">
+            <div class="mockup-dot red"></div>
+            <div class="mockup-dot yellow"></div>
+            <div class="mockup-dot green"></div>
+            <span style="margin-left: 0.5rem; font-size: 0.8rem; color: var(--gray);">
+              dashboard / documents
+            </span>
+          </div>
+
+          <div class="mockup-invoice">
+            <div class="mockup-invoice-left">
+              <div class="mockup-icon">📄</div>
+              <div class="mockup-info">
+                <span class="mockup-filename">FAC-2026-0053.pdf</span>
+                <span class="mockup-supplier">Ettijeri Bank</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="mockup-amount">120,00 DT</div>
+              <span class="mockup-badge badge-success">✓ Auto-approuvé</span>
+            </div>
+          </div>
+
+          <div class="mockup-invoice">
+            <div class="mockup-invoice-left">
+              <div class="mockup-icon">📄</div>
+              <div class="mockup-info">
+                <span class="mockup-filename">FAC-2026-0060.pdf</span>
+                <span class="mockup-supplier">Elec-Connect</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="mockup-amount">1 198,00 DT</div>
+              <span class="mockup-badge badge-warning">⚠ Vérification</span>
+            </div>
+          </div>
+
+          <div class="mockup-invoice">
+            <div class="mockup-invoice-left">
+              <div class="mockup-icon">📄</div>
+              <div class="mockup-info">
+                <span class="mockup-filename">FAC-2026-0052.pdf</span>
+                <span class="mockup-supplier">Huilerie Sahnoun</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="mockup-amount">600,00 DT</div>
+              <span class="mockup-badge badge-info">📤 Livré</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 2px solid var(--light); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--gray);">
+              ⚡ Traité en 4,2 secondes
+            </span>
+            <span class="mockup-badge badge-success">IA Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FEATURES
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Tout ce dont vous avez besoin</h2>
+        <p class="section-subtitle">
+          Une plateforme complète pour gérer vos documents comptables de bout en bout.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon">🤖</div>
+          <h3 class="feature-title">Extraction IA</h3>
+          <p class="feature-desc">
+            Notre IA analyse chaque document et extrait automatiquement les champs clés : fournisseur, montant, date, TVA, lignes de facturation.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">✅</div>
+          <h3 class="feature-title">Vérification intelligente</h3>
+          <p class="feature-desc">
+            Détection automatique des anomalies avec seuils de confiance personnalisables. Les documents douteux sont signalés pour vérification manuelle.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">📊</div>
+          <h3 class="feature-title">Tableaux de bord</h3>
+          <p class="feature-desc">
+            Visualisez vos statistiques en temps réel : montants, fournisseurs, tendances, exceptions. Tout sous les yeux, en un coup d'œil.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">📧</div>
+          <h3 class="feature-title">Réception automatique</h3>
+          <p class="feature-desc">
+            Vos fournisseurs envoient leurs factures par email. Notre système les récupère, les analyse et les classe automatiquement.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">💬</div>
+          <h3 class="feature-title">Assistant IA</h3>
+          <p class="feature-desc">
+            Posez vos questions en langage naturel : "Quelles factures dépassent 1000 DT ?" L'IA répond en interrogeant directement votre base.
+          </p>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon">🔒</div>
+          <h3 class="feature-title">Sécurité maximale</h3>
+          <p class="feature-desc">
+            Authentification 2FA, licences sécurisées, audit complet des actions. Vos données sont protégées avec les meilleurs standards.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HOW IT WORKS
+       ═══════════════════════════════════════════════════════════ -->
+  <section id="how">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Comment ça marche ?</h2>
+        <p class="section-subtitle">
+          Trois étapes simples pour automatiser votre comptabilité.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-number">1</div>
+          <h3 class="step-title">Uploadez</h3>
+          <p class="step-desc">
+            Envoyez vos factures par email ou déposez-les directement sur la plateforme. PDF, images, Excel — tous les formats sont acceptés.
+          </p>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-number">2</div>
+          <h3 class="step-title">L'IA analyse</h3>
+          <p class="step-desc">
+            En quelques secondes, notre IA extrait les informations clés, vérifie la cohérence et détecte les éventuelles anomalies.
+          </p>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-number">3</div>
+          <h3 class="step-title">Validez</h3>
+          <p class="step-desc">
+            Consultez les résultats, approuvez les documents fiables, vérifiez les cas douteux. Votre comptabilité est à jour automatiquement.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       PRICING
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Des tarifs simples et transparents</h2>
+        <p class="section-subtitle">
+          Choisissez la formule adaptée à votre activité.
+        </p>
+      </div>
+
+      <div class="pricing-grid">
+        <div class="price-card reveal">
+          <h3 class="price-name">Découverte</h3>
+          <div class="price-value">0 DT</div>
+          <div class="price-period">10 jours d'essai</div>
+          <ul class="price-features">
+            <li>Jusqu'à 50 documents</li>
+            <li>Extraction IA de base</li>
+            <li>Support par email</li>
+            <li>Accès au dashboard</li>
+          </ul>
+          <a href="/signup" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+            Commencer
+          </a>
+        </div>
+
+        <div class="price-card featured reveal">
+          <div class="price-badge">POPULAIRE</div>
+          <h3 class="price-name">Professionnel</h3>
+          <div class="price-value">49 DT</div>
+          <div class="price-period">par mois</div>
+          <ul class="price-features">
+            <li>Documents illimités</li>
+            <li>Extraction IA avancée</li>
+            <li>Assistant IA conversationnel</li>
+            <li>Réception email automatique</li>
+            <li>Rapports et statistiques</li>
+            <li>Support prioritaire</li>
+          </ul>
+          <a href="/signup" class="btn btn-primary" style="width: 100%; justify-content: center;">
+            Essayer 14 jours
+          </a>
+        </div>
+
+        <div class="price-card reveal">
+          <h3 class="price-name">Entreprise</h3>
+          <div class="price-value">Sur devis</div>
+          <div class="price-period">Tarification personnalisée</div>
+          <ul class="price-features">
+            <li>Tout le plan Pro</li>
+            <li>Multi-utilisateurs</li>
+            <li>SSO / SAML</li>
+            <li>API dédiée</li>
+            <li>Déploiement sur mesure</li>
+            <li>Support 24/7</li>
+          </ul>
+          <a href="mailto:contact@accounting-ai.com" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+            Nous contacter
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CTA FINAL
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="cta-final">
+    <div class="container">
+      <h2 class="section-title reveal">
+        Prêt à transformer votre comptabilité ?
+      </h2>
+      <p class="section-subtitle reveal">
+        Rejoignez les entreprises qui ont déjà divisé par 10 leur temps de traitement.
+      </p>
+      <div class="reveal">
+        <a href="/signup" class="btn btn-white">
+          🚀 Commencer gratuitement
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ -->
+  <footer>
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <span>Accounting AI</span>
+    </div>
+    <p>© 2026 Accounting AI Automation. Tous droits réservés.</p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.6;">
+      Propulsé par Next.js, Supabase, Groq & Resend
+    </p>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCRIPT — SCROLL REVEAL
+       ═══════════════════════════════════════════════════════════ -->
+  <script>
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+  </script>
+</body>
+</html>

@@ -26,6 +26,7 @@ export function Sidebar() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState<string>("");
+  const [fullName, setFullName] = useState<string>("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -36,6 +37,7 @@ export function Sidebar() {
       .then((data) => {
         setProfile(data.profile ?? null);
         setEmail(data.email ?? "");
+        setFullName(data.profile?.full_name ?? "");
         setIsSuperAdmin(!!data.is_super_admin);
       })
       .catch(() => {});
@@ -73,20 +75,22 @@ export function Sidebar() {
   ];
 
   const analysisLinks = [
-    { href: "/dashboard/audit", label: "Audit Log", icon: "🔍" },
+    ...(isAdmin
+      ? [{ href: "/dashboard/audit", label: "Audit Log", icon: "🔍" }]
+      : []),
     { href: "/dashboard/reports", label: "Rapports", icon: "📊" },
   ];
 
   const settingsLinks = [
-  { href: "/dashboard/settings/license", label: "Ma licence", icon: "🔑" },
-  ...(isAdmin
-    ? [
-        { href: "/dashboard/settings/users", label: "Utilisateurs", icon: "👥" },
-        { href: "/dashboard/settings/email", label: "Settings", icon: "⚙️" },  // ⭐
-      ]
-    : []),
-  { href: "/dashboard/settings/security", label: "Sécurité", icon: "🔒" },
-];
+    { href: "/dashboard/settings/license", label: "Ma licence", icon: "🔑" },
+    ...(isAdmin
+      ? [
+          { href: "/dashboard/settings/users", label: "Utilisateurs", icon: "👥" },
+          { href: "/dashboard/settings/email", label: "Settings", icon: "⚙️" },
+        ]
+      : []),
+    { href: "/dashboard/settings/security", label: "Sécurité", icon: "🔒" },
+  ];
 
   const superAdminLinks = [
     { href: "/super-admin/licenses", label: "Licences", icon: "💰" },
@@ -140,11 +144,22 @@ export function Sidebar() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  INITIALES POUR L'AVATAR
+  //  INITIALES + NOM + RÔLE
   // ═══════════════════════════════════════════════════════════
 
   const initials = email ? email.slice(0, 2).toUpperCase() : "??";
-  const roleLabel = role ? ROLE_LABELS[role] ?? role : "—";
+
+  // ⭐ Nom affiché : full_name prioritaire, sinon "Super Admin", sinon email
+  const displayName = isSuperAdmin
+    ? (fullName || "Super Admin")
+    : (fullName || email || "—");
+
+  // ⭐ Rôle affiché : "Super Admin" si super-admin, sinon le rôle profiles
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : role
+    ? ROLE_LABELS[role] ?? role
+    : "—";
 
   // ═══════════════════════════════════════════════════════════
   //  SIDEBAR
@@ -202,13 +217,13 @@ export function Sidebar() {
             {initials}
           </div>
 
-          {/* Email + Rôle */}
+          {/* Nom + Rôle */}
           <div className="flex-1 min-w-0">
             <p
               className="text-xs font-medium text-gray-900 truncate"
               title={email}
             >
-              {email || "—"}
+              {displayName}
             </p>
             <p className="text-[11px] text-gray-500 truncate">
               {roleLabel}

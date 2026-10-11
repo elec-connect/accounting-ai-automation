@@ -42,7 +42,19 @@ export function LoginForm() {
       ? '/super-admin/licenses'
       : redirect || '/dashboard';
 
-    // ⭐ window.location.href force le passage par le middleware
+    // ⭐ Logger le login (avant la redirection)
+    await fetch('/api/audit/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        details: { method: 'password' },
+      }),
+    }).catch(() => {
+      // Ignore les erreurs de log — on ne bloque pas le login
+    });
+
+    // ⭐ Rediriger
     window.location.href = target;
   }
 

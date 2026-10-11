@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
+import { logAudit } from '@/lib/audit/log';
 
 export async function POST(request: Request) {
   console.log('=== UPLOAD START ===');
@@ -116,8 +117,6 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('=== UPLOAD SUCCESS ===');
-
     // ═══════════════════════════════════════════════════════════
     //  ✨ DÉCLENCHEMENT DE L'EXTRACTION SELON LE MODE
     // ═══════════════════════════════════════════════════════════
@@ -126,7 +125,6 @@ export async function POST(request: Request) {
     let pipelineMode = 'auto';
 
     try {
-      // Lire le mode depuis settings
       const { data: modeSetting } = await supabase
         .from('settings')
         .select('value')
@@ -143,7 +141,6 @@ export async function POST(request: Request) {
           process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
         ).replace(/\/+$/, '');
 
-        // Déclencher l'extraction (sans attendre la fin pour ne pas bloquer l'upload)
         fetch(`${appUrl}/api/documents/${data.id}/extract`, {
           method: 'POST',
           headers: {
@@ -161,8 +158,24 @@ export async function POST(request: Request) {
       }
     } catch (modeError) {
       console.error('Error reading pipeline_mode:', modeError);
-      // En cas d'erreur, on reste en mode manuel par défaut
     }
+
+    // ⭐ Logger l'upload (une seule fois, après tout le traitement)
+    await logAudit({
+      action: 'document_upload',
+      entityType: 'document',
+      entityId: data.id,
+      details: {
+        filename: file.name,
+        size: file.size,
+        content_type: file.type,
+        pipeline_mode: pipelineMode,
+        extraction_triggered: extractionTriggered,
+      },
+      request,
+    });
+
+    console.log('=== UPLOAD SUCCESS ===');
 
     return NextResponse.json({
       success: true,

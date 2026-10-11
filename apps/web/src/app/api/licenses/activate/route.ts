@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { isValidLicenseFormat, calculateExpiry, type LicenseDuration } from '@/lib/license/generate';
+import { logAudit } from '@/lib/audit/log';
 
 export const runtime = 'nodejs';
 
@@ -112,6 +113,21 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+
+    // ⭐ Logger l'activation
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'license_activate',
+      entityType: 'license',
+      entityId: activated.id,
+      details: {
+        license_key: normalizedKey,
+        duration: activated.duration_type,
+        expires_at: activated.expires_at,
+      },
+      request,
+    });
 
     console.log(`✅ License activée : ${normalizedKey} par ${user.email}`);
 

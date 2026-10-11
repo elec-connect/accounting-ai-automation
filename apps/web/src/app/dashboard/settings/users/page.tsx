@@ -91,6 +91,51 @@ export default function UsersPage() {
       setTimeout(() => setMessage(null), 3000);
     }
   }
+  async function handleDelete(userId: string, email: string) {
+  const confirmation = confirm(
+    `⚠️ Supprimer définitivement l'utilisateur "${email}" ?\n\nCette action est IRRÉVERSIBLE.`
+  );
+
+  if (!confirmation) return;
+
+  // Double confirmation pour les cas sensibles
+  const doubleCheck = confirm(
+    `Confirmez-vous la suppression de ${email} ?\n\nToutes ses données seront perdues.`
+  );
+
+  if (!doubleCheck) return;
+
+  setSaving(userId);
+  setMessage(null);
+
+  try {
+    const res = await fetch("/api/settings/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      setMessage({
+        type: "success",
+        text: `✅ ${email} supprimé`,
+      });
+      await loadUsers();
+    } else {
+      setMessage({ type: "error", text: "❌ " + data.error });
+    }
+  } catch (err) {
+    setMessage({
+      type: "error",
+      text: "❌ " + (err instanceof Error ? err.message : "Erreur"),
+    });
+  } finally {
+    setSaving(null);
+    setTimeout(() => setMessage(null), 4000);
+  }
+}
 
   if (loading) {
     return <div className="p-8 text-gray-500">Loading...</div>;
@@ -149,18 +194,29 @@ export default function UsersPage() {
                   </Badge>
                 </td>
                 <td className="p-3">
-                  <Button
-                    onClick={() => toggleActive(user.id, user.is_active)}
-                    disabled={saving === user.id}
-                    className="text-xs py-1 px-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50"
-                  >
-                    {saving === user.id
-                      ? "…"
-                      : user.is_active
-                      ? "Disable"
-                      : "Enable"}
-                  </Button>
-                </td>
+  <div className="flex items-center gap-2">
+    <Button
+      onClick={() => toggleActive(user.id, user.is_active)}
+      disabled={saving === user.id}
+      className="text-xs py-1 px-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50"
+    >
+      {saving === user.id
+        ? "…"
+        : user.is_active
+        ? "Disable"
+        : "Enable"}
+    </Button>
+
+    <Button
+      onClick={() => handleDelete(user.id, user.email)}
+      disabled={saving === user.id}
+      className="text-xs py-1 px-2 bg-red-600 hover:bg-red-700 disabled:opacity-50"
+      title="Supprimer définitivement cet utilisateur"
+    >
+      🗑️ Supprimer
+    </Button>
+  </div>
+</td>
               </tr>
             ))}
           </tbody>

@@ -13,7 +13,10 @@ type AuditAction =
   | 'user_create'
   | 'user_update'
   | 'user_delete'
-  | 'exception_resolve';
+  | 'exception_resolve'
+  | 'license_activate'
+  | 'license_create'
+  | 'license_revoke';
 
 export async function logAudit(params: {
   userId?: string | null;
