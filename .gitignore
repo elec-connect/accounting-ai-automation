@@ -70,3 +70,22 @@ temp/
 tmp/
 *.bak
 .vercel
+
+# ═══════════════════════════════════════════════════════════════
+#  SECRETS ET BACKUPS (NE JAMAIS COMMITTER)
+# ═══════════════════════════════════════════════════════════════
+.env*.backup
+.env.local.cloud.backup
+env_backup_*
+*.backup
+test_login.json
+*.bak
+
+# ═══════════════════════════════════════════════════════════════
+#  INSTALLEURS (à distribuer séparément)
+# ═══════════════════════════════════════════════════════════════
+installer.iss
+prerequisites/
+package/
+*.exe
+*.dmg
