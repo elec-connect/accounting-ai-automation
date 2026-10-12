@@ -7,6 +7,10 @@ import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
 
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
+     // ⭐ Section Entreprise
+  company_name: "",
+  company_tax_id: "",
+  company_email: "",
     // ─── IA (Groq) — VISIBLE POUR TOUS ────────────
     groq_api_key: "",
 
@@ -96,6 +100,74 @@ export default function EmailSettingsPage() {
     <main className="p-8 max-w-2xl">
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
+
+        {/* ═══════════════════════════════════════════
+    SECTION ENTREPRISE (identité comptable)
+    ═══════════════════════════════════════════ */}
+<h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+  🏢 Mon entreprise
+</h3>
+<p className="text-sm text-gray-500 mb-6">
+  Renseignez les informations de votre entreprise. Elles servent à
+  déterminer automatiquement si une facture est <strong>émise</strong> (vente)
+  ou <strong>reçue</strong> (achat).
+  <br />
+  <span className="text-xs">
+    Plus vous renseignez de champs, plus la détection sera fiable (3/3 = confiance totale).
+  </span>
+</p>
+
+<div className="space-y-4 mb-8">
+  <div>
+    <label className="block text-sm font-semibold mb-1">
+      Nom de votre entreprise
+    </label>
+    <input
+      type="text"
+      value={settings.company_name || ""}
+      onChange={(e) =>
+        setSettings({ ...settings, company_name: e.target.value })
+      }
+      placeholder="ex: elec-connect1"
+      className="w-full border rounded px-3 py-2"
+    />
+    <p className="text-xs text-gray-500 mt-1">
+      Doit correspondre exactement au nom figurant sur vos factures.
+    </p>
+  </div>
+
+  <div>
+    <label className="block text-sm font-semibold mb-1">
+      Matricule fiscal
+    </label>
+    <input
+      type="text"
+      value={settings.company_tax_id || ""}
+      onChange={(e) =>
+        setSettings({ ...settings, company_tax_id: e.target.value })
+      }
+      placeholder="ex: MF-123456789"
+      className="w-full border rounded px-3 py-2 font-mono text-sm"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm font-semibold mb-1">
+      Email de l'entreprise
+    </label>
+    <input
+      type="email"
+      value={settings.company_email || ""}
+      onChange={(e) =>
+        setSettings({ ...settings, company_email: e.target.value })
+      }
+      placeholder="ex: contact@monentreprise.com"
+      className="w-full border rounded px-3 py-2"
+    />
+  </div>
+</div>
+
+<div className="border-b mt-8 mb-8"></div>
 
         {/* Guide de configuration — VISIBLE POUR TOUS */}
 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">

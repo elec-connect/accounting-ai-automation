@@ -56,7 +56,8 @@ export async function POST(
       10
     );
     const SEVERITY_HIGH_THRESHOLD = parseInt(
-      thresholds.confidence_high_severity || String(DEFAULT_SEVERITY_HIGH_THRESHOLD),
+      thresholds.confidence_high_severity ||
+        String(DEFAULT_SEVERITY_HIGH_THRESHOLD),
       10
     );
 
@@ -259,14 +260,15 @@ export async function POST(
 
 {
   "type": "invoice" | "quote" | "delivery_note" | "receipt" | "other",
-  "direction": "issued" | "received",
   "extracted": {
     "invoice_number": "...",
     "invoice_date": "YYYY-MM-DD",
     "supplier_name": "...",
     "supplier_tax_id": "...",
+    "supplier_email": "...",
     "customer_name": "...",
     "customer_tax_id": "...",
+    "customer_email": "...",
     "total_amount_ht": 0.00,
     "total_vat": 0.00,
     "tva_rate": 19,
@@ -301,11 +303,13 @@ DÉTECTION DU TYPE (champ "type") :
 - "receipt" : Reçu ("reçu", "receipt", "ticket")
 - "other" : Tout autre document
 
-DÉTECTION DU SENS (champ "direction") :
-- "issued" : Facture émise PAR votre entreprise (vous êtes le vendeur)
-  Indices : votre nom apparaît comme émetteur, "Facture n°..." avec vos coordonnées
-- "received" : Facture reçue D'UN fournisseur (vous êtes le client)
-  Indices : un fournisseur externe est l'émetteur, vous êtes le destinataire
+DÉTECTION DES PARTIES :
+- "supplier_name" : Le nom de l'ENTREPRISE QUI ÉMET la facture (le vendeur, en haut du document)
+- "customer_name" : Le nom du CLIENT / DESTINATAIRE (celui qui reçoit la facture)
+- "supplier_tax_id" : Le matricule fiscal de l'émetteur
+- "customer_tax_id" : Le matricule fiscal du destinataire
+- "supplier_email" : L'email de l'émetteur
+- "customer_email" : L'email du destinataire
 
 DÉTECTION DU TAUX TVA (champ "tva_rate") :
 - 19 : Taux standard Tunisie
@@ -341,7 +345,6 @@ ${rawText.slice(0, 8000)}`,
     // ─────────────────────────────────────────────────────────
     let parsed: {
       type?: string;
-      direction?: string;
       extracted?: Record<string, unknown>;
       confidence?: number;
       confidence_details?: Record<string, unknown>;
@@ -355,7 +358,10 @@ ${rawText.slice(0, 8000)}`,
       throw new Error('Le modèle IA a retourné un JSON invalide.');
     }
 
-    const extractedFields = (parsed.extracted ?? parsed) as Record<string, unknown>;
+    const extractedFields = (parsed.extracted ?? parsed) as Record<
+      string,
+      unknown
+    >;
 
     const confidenceScore =
       typeof parsed.confidence === 'number' &&
@@ -366,13 +372,13 @@ ${rawText.slice(0, 8000)}`,
 
     const confidenceDetails = parsed.confidence_details ?? {};
     const warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
-    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions
+      : [];
     const detectedType = (parsed.type as string) || 'other';
-    const detectedDirection = (parsed.direction as 'issued' | 'received') || 'received';
 
     console.log('AI response received. Confidence:', confidenceScore);
     console.log('Detected type:', detectedType);
-    console.log('Detected direction:', detectedDirection);
     console.log('Suggestions:', suggestions.length);
 
     // ─────────────────────────────────────────────────────────
@@ -394,7 +400,10 @@ ${rawText.slice(0, 8000)}`,
       .single();
 
     if (insertError || !extraction) {
-      console.error('Erreur d\u2019enregistrement de l\u2019extraction:', insertError?.message);
+      console.error(
+        'Erreur d\u2019enregistrement de l\u2019extraction:',
+        insertError?.message
+      );
       return NextResponse.json(
         {
           error:
@@ -407,28 +416,73 @@ ${rawText.slice(0, 8000)}`,
 
     // ─────────────────────────────────────────────────────────
     //  8b. ⭐ GÉNÉRER LES ÉCRITURES COMPTABLES
+    //      (AVANT la décision automatique pour gérer les warnings)
     // ─────────────────────────────────────────────────────────
-    let accountingResult: { success: boolean; count?: number; error?: string } = {
-      success: false,
-    };
+    let accountingResult: {
+      success: boolean;
+      count?: number;
+      direction?: 'issued' | 'received';
+      detection?: {
+        direction: 'issued' | 'received';
+        score: number;
+        totalCriteria: number;
+        confidence: 'high' | 'medium' | 'low' | 'uncertain';
+        reasons: string[];
+      };
+      error?: string;
+      warning?: string;
+    } = { success: false };
 
+    // ⚠️ On ne passe PAS detectedDirection (l'IA) :
+    // la détection est faite automatiquement via company_name/tax_id/email
     try {
       console.log('📊 Génération des écritures comptables...');
 
-      accountingResult = await saveAccountingEntries(
-        id,
-        extractedFields,
-        detectedDirection
-      );
+      accountingResult = await saveAccountingEntries(id, extractedFields);
 
       if (accountingResult.success) {
-        console.log(`✅ ${accountingResult.count} écriture(s) comptable(s) générée(s)`);
+        console.log(
+          `✅ ${accountingResult.count} écriture(s) générée(s) en mode "${accountingResult.direction}"`
+        );
+
+        if (accountingResult.warning) {
+          console.warn('⚠️', accountingResult.warning);
+          warnings.push(accountingResult.warning);
+
+          // Ajouter aux warnings dans la DB
+          await supabase
+            .from('extractions')
+            .update({ warnings })
+            .eq('document_id', id);
+        }
       } else {
-        console.warn('⚠️ Écritures comptables non générées:', accountingResult.error);
+        console.warn(
+          '⚠️ Écritures comptables non générées:',
+          accountingResult.error ?? 'raison inconnue'
+        );
+        warnings.push(
+          `⚠️ Écritures comptables non générées : ${
+            accountingResult.error ?? 'raison inconnue'
+          }`
+        );
+
+        await supabase
+          .from('extractions')
+          .update({ warnings })
+          .eq('document_id', id);
       }
     } catch (accError) {
       console.error('Accounting entries generation failed:', accError);
-      // Non bloquant : on continue même si les écritures échouent
+      warnings.push(
+        `⚠️ Erreur génération écritures : ${
+          accError instanceof Error ? accError.message : 'inconnue'
+        }`
+      );
+
+      await supabase
+        .from('extractions')
+        .update({ warnings })
+        .eq('document_id', id);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -437,6 +491,16 @@ ${rawText.slice(0, 8000)}`,
     let shouldCreateException = confidenceScore < CONFIDENCE_THRESHOLD;
     let newStatus = shouldCreateException ? 'exception' : 'auto_approved';
     let exceptionReason = `Confiance IA faible (${confidenceScore.toFixed(0)}% < ${CONFIDENCE_THRESHOLD}%)`;
+
+    // ⭐ Si la détection comptable est incertaine → forcer une exception
+    if (
+      accountingResult.detection?.confidence === 'low' ||
+      accountingResult.detection?.confidence === 'uncertain'
+    ) {
+      shouldCreateException = true;
+      newStatus = 'exception';
+      exceptionReason = `${accountingResult.warning ?? 'Détection comptable incertaine'} — Sens : ${accountingResult.direction ?? 'inconnu'}`;
+    }
 
     // ─────────────────────────────────────────────────────────
     //  10. Détection de doublons
@@ -520,7 +584,10 @@ ${rawText.slice(0, 8000)}`,
         });
 
       if (exceptionError) {
-        console.error('Erreur de création de l\u2019exception:', exceptionError.message);
+        console.error(
+          'Erreur de création de l\u2019exception:',
+          exceptionError.message
+        );
       } else {
         console.log('✅ Exception créée automatiquement');
 
@@ -553,7 +620,6 @@ ${rawText.slice(0, 8000)}`,
       confidence: confidenceScore,
       status: newStatus,
       type: detectedType,
-      direction: detectedDirection,
       exceptionCreated: shouldCreateException,
       summary: summaryResult.summary ?? null,
       summaryGenerated: summaryResult.success,
@@ -561,6 +627,9 @@ ${rawText.slice(0, 8000)}`,
       accounting: {
         entriesCreated: accountingResult.count ?? 0,
         success: accountingResult.success,
+        direction: accountingResult.direction ?? null,
+        detection: accountingResult.detection ?? null,
+        warning: accountingResult.warning ?? null,
         error: accountingResult.error ?? null,
       },
       rawText,
@@ -593,11 +662,12 @@ async function generateSummary(
 }> {
   try {
     const appUrl = (
-      process.env.NEXT_PUBLIC_APP_URL ||
-      new URL(request.url).origin
+      process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
     ).replace(/\/+$/, '');
 
-    const summaryUrl = `${appUrl}/api/documents/${encodeURIComponent(id)}/summarize`;
+    const summaryUrl = `${appUrl}/api/documents/${encodeURIComponent(
+      id
+    )}/summarize`;
 
     console.log('=== SUMMARY REQUEST ===');
     console.log('Summary URL:', summaryUrl);
