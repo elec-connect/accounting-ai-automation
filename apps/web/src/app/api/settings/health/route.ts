@@ -1,78 +1,65 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getSettings } from '@/lib/settings/get';
+
+export const runtime = 'nodejs';
 
 export async function GET() {
   try {
     const supabase = await createClient();
-
     const { data: { user } } = await supabase.auth.getUser();
+
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from("settings")
-      .select("key, value");
+    // ⭐ Lire les settings depuis la table (priorité) ou env
+    const settings = await getSettings([
+      'supabase_url',
+      'supabase_anon_key',
+      'supabase_service_role_key',
+      'groq_api_key',
+      'resend_api_key',
+      'cron_secret',
+    ]);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    const settings: Record<string, string> = {};
-    for (const row of data || []) {
-      settings[row.key] = row.value ?? "";
-    }
-
-    // Définition des variables à vérifier
+    // Vérifier aussi process.env en fallback
     const checks = [
       {
-        key: "NEXT_PUBLIC_SUPABASE_URL",
-        label: "Supabase URL",
-        scope: "env",
+        key: 'NEXT_PUBLIC_SUPABASE_URL',
+        label: 'Supabase URL',
         critical: true,
-        ok: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        ok: !!(process.env.NEXT_PUBLIC_SUPABASE_URL || settings.supabase_url),
       },
       {
-        key: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-        label: "Supabase Anon Key",
-        scope: "env",
+        key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+        label: 'Supabase Anon Key',
         critical: true,
-        ok: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        ok: !!(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || settings.supabase_anon_key),
       },
       {
-        key: "SUPABASE_SERVICE_ROLE_KEY",
-        label: "Supabase Service Role",
-        scope: "env",
+        key: 'SUPABASE_SERVICE_ROLE_KEY',
+        label: 'Supabase Service Role',
         critical: true,
-        ok: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        ok: !!(process.env.SUPABASE_SERVICE_ROLE_KEY || settings.supabase_service_role_key),
       },
       {
-        key: "GROQ_API_KEY",
-        label: "Groq API Key",
-        scope: "env",
+        key: 'GROQ_API_KEY',
+        label: 'Groq API Key',
         critical: true,
-        ok: !!process.env.GROQ_API_KEY,
+        ok: !!(process.env.GROQ_API_KEY || settings.groq_api_key),
       },
       {
-        key: "RESEND_API_KEY",
-        label: "Resend API Key",
-        scope: "settings",
+        key: 'RESEND_API_KEY',
+        label: 'Resend API Key',
         critical: true,
-        ok: !!settings.resend_api_key,
+        ok: !!(process.env.RESEND_API_KEY || settings.resend_api_key),
       },
       {
-        key: "CRON_SECRET",
-        label: "Cron Secret",
-        scope: "env",
-        critical: true,
-        ok: !!process.env.CRON_SECRET,
-      },
-      {
-        key: "NEXT_PUBLIC_APP_URL",
-        label: "App URL publique",
-        scope: "env",
+        key: 'CRON_SECRET',
+        label: 'Cron Secret',
         critical: false,
-        ok: !!process.env.NEXT_PUBLIC_APP_URL,
+        ok: !!(process.env.CRON_SECRET || settings.cron_secret),
       },
     ];
 
@@ -92,7 +79,7 @@ export async function GET() {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

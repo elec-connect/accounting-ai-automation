@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendExceptionEmail } from '@/lib/email/send-exception-email';
 import OpenAI from 'openai';
+import { saveAccountingEntries } from '@/lib/accounting/save-entries';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -258,14 +259,17 @@ export async function POST(
 
 {
   "type": "invoice" | "quote" | "delivery_note" | "receipt" | "other",
+  "direction": "issued" | "received",
   "extracted": {
     "invoice_number": "...",
     "invoice_date": "YYYY-MM-DD",
     "supplier_name": "...",
     "supplier_tax_id": "...",
     "customer_name": "...",
+    "customer_tax_id": "...",
     "total_amount_ht": 0.00,
     "total_vat": 0.00,
+    "tva_rate": 19,
     "total_amount_ttc": 0.00,
     "currency": "TND",
     "line_items": [
@@ -297,6 +301,19 @@ DÉTECTION DU TYPE (champ "type") :
 - "receipt" : Reçu ("reçu", "receipt", "ticket")
 - "other" : Tout autre document
 
+DÉTECTION DU SENS (champ "direction") :
+- "issued" : Facture émise PAR votre entreprise (vous êtes le vendeur)
+  Indices : votre nom apparaît comme émetteur, "Facture n°..." avec vos coordonnées
+- "received" : Facture reçue D'UN fournisseur (vous êtes le client)
+  Indices : un fournisseur externe est l'émetteur, vous êtes le destinataire
+
+DÉTECTION DU TAUX TVA (champ "tva_rate") :
+- 19 : Taux standard Tunisie
+- 13 : Taux intermédiaire
+- 7 : Taux réduit
+- 0 : Exonéré
+Si le taux n'est pas visible, calcule : total_vat / total_amount_ht * 100
+
 RÈGLES DE SCORING (confidence global 0-100) :
 - 95-100 : tous les champs critiques présents, montants cohérents, document net
 - 80-94  : champs présents mais un doute léger sur un montant ou une date
@@ -324,6 +341,7 @@ ${rawText.slice(0, 8000)}`,
     // ─────────────────────────────────────────────────────────
     let parsed: {
       type?: string;
+      direction?: string;
       extracted?: Record<string, unknown>;
       confidence?: number;
       confidence_details?: Record<string, unknown>;
@@ -350,9 +368,11 @@ ${rawText.slice(0, 8000)}`,
     const warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
     const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
     const detectedType = (parsed.type as string) || 'other';
+    const detectedDirection = (parsed.direction as 'issued' | 'received') || 'received';
 
     console.log('AI response received. Confidence:', confidenceScore);
     console.log('Detected type:', detectedType);
+    console.log('Detected direction:', detectedDirection);
     console.log('Suggestions:', suggestions.length);
 
     // ─────────────────────────────────────────────────────────
@@ -383,6 +403,32 @@ ${rawText.slice(0, 8000)}`,
         },
         { status: 500 }
       );
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  8b. ⭐ GÉNÉRER LES ÉCRITURES COMPTABLES
+    // ─────────────────────────────────────────────────────────
+    let accountingResult: { success: boolean; count?: number; error?: string } = {
+      success: false,
+    };
+
+    try {
+      console.log('📊 Génération des écritures comptables...');
+
+      accountingResult = await saveAccountingEntries(
+        id,
+        extractedFields,
+        detectedDirection
+      );
+
+      if (accountingResult.success) {
+        console.log(`✅ ${accountingResult.count} écriture(s) comptable(s) générée(s)`);
+      } else {
+        console.warn('⚠️ Écritures comptables non générées:', accountingResult.error);
+      }
+    } catch (accError) {
+      console.error('Accounting entries generation failed:', accError);
+      // Non bloquant : on continue même si les écritures échouent
     }
 
     // ─────────────────────────────────────────────────────────
@@ -507,10 +553,16 @@ ${rawText.slice(0, 8000)}`,
       confidence: confidenceScore,
       status: newStatus,
       type: detectedType,
+      direction: detectedDirection,
       exceptionCreated: shouldCreateException,
       summary: summaryResult.summary ?? null,
       summaryGenerated: summaryResult.success,
       summaryError: summaryResult.error ?? null,
+      accounting: {
+        entriesCreated: accountingResult.count ?? 0,
+        success: accountingResult.success,
+        error: accountingResult.error ?? null,
+      },
       rawText,
     });
   } catch (error) {

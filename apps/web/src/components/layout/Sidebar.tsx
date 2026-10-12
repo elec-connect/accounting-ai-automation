@@ -76,6 +76,7 @@ export function Sidebar() {
   const mainLinks = [
     { href: "/dashboard", label: "Dashboard", icon: "📊" },
     { href: "/dashboard/documents", label: "Documents", icon: "📄" },
+    { href: "/dashboard/accounting", label: "Comptabilité", icon: "💰" },
     { href: "/dashboard/search", label: "Recherche", icon: "🔍" },
     { href: "/dashboard/exceptions", label: "Exceptions", icon: "⚠️" },
     { href: "/dashboard/ask", label: "Ask AI", icon: "🤖" },

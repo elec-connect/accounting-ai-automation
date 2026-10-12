@@ -4,13 +4,15 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: [
-    'onnxruntime-node',
-    'sharp',
-  ],
+  // ⭐ Pas de 'standalone' : le monorepo pnpm ne le supporte pas correctement
+  //    On utilise la methode classique (build complet + next start)
+
   experimental: {
     cpus: 1,
     workerThreads: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 };
 

@@ -19,7 +19,11 @@
       "@swc/core",
       "tesseract.js",
       "esbuild",
-      "sharp"
+      "sharp",
+      "@xenova/transformers",
+      "protobufjs",
+      "mammoth",
+      "xlsx"
     ]
   },
   "engines": {

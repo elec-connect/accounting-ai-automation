@@ -1,0 +1,119 @@
+CONTRAT DE LICENCE UTILISATEUR FINAL (CLUF)
+Accounting AI Automation
+===========================================================
+
+Version 1.0.0
+Date : 12 Octobre 2026
+
+-----------------------------------------------------------
+1. ACCEPTATION DES CONDITIONS
+-----------------------------------------------------------
+
+En installant, copiant ou utilisant le logiciel Accounting
+AI Automation (le "Logiciel"), vous acceptez sans reserve
+les termes du present contrat.
+
+Si vous n'acceptez pas ces conditions, n'installez pas le
+Logiciel et supprimez-le immediatement.
+
+-----------------------------------------------------------
+2. LICENCE D'UTILISATION
+-----------------------------------------------------------
+
+Le detenteur de la licence se voit accorder un droit
+d'utilisation non exclusif et non transferable du Logiciel
+pour :
+
+  - Une (1) installation sur un seul ordinateur
+  - Un (1) utilisateur principal
+  - Un usage professionnel interne uniquement
+
+-----------------------------------------------------------
+3. RESTRICTIONS
+-----------------------------------------------------------
+
+Il est strictement interdit de :
+
+  - Copier, modifier ou distribuer le Logiciel
+  - Vendre, louer ou preter le Logiciel
+  - Proceder a l'ingenierie inverse (reverse engineering)
+  - Retirer les mentions de copyright
+  - Utiliser le Logiciel pour un service concurrent
+  - Partager la cle de licence avec des tiers
+
+-----------------------------------------------------------
+4. PROPRIETE INTELLECTUELLE
+-----------------------------------------------------------
+
+Le Logiciel, incluant son code source, sa documentation et
+ses elements graphiques, est la propriete exclusive de
+Elec-Connect et est protege par les lois sur le droit
+d'auteur.
+
+-----------------------------------------------------------
+5. DONNEES UTILISATEUR
+-----------------------------------------------------------
+
+Toutes les donnees (factures, documents, utilisateurs)
+sont stockees LOCALEMENT sur votre ordinateur.
+
+Le Logiciel n'envoie aucune donnee metier a un serveur
+externe. Seule la verification de licence necessite une
+connexion internet.
+
+Vous etes responsable de la sauvegarde de vos donnees.
+
+-----------------------------------------------------------
+6. GARANTIES
+-----------------------------------------------------------
+
+Le Logiciel est fourni "en l'etat". Elec-Connect ne garantit
+pas que le Logiciel sera exempt d'erreurs ou fonctionnera
+sans interruption.
+
+-----------------------------------------------------------
+7. LIMITATION DE RESPONSABILITE
+-----------------------------------------------------------
+
+Elec-Connect ne pourra etre tenu responsable de tout dommage
+indirect, accidentel ou consecutif decoulant de l'utilisation
+ou de l'impossibilite d'utiliser le Logiciel.
+
+La responsabilite totale d'Elec-Connect ne saurait exceder
+le montant paye pour la licence.
+
+-----------------------------------------------------------
+8. RESILIATION
+-----------------------------------------------------------
+
+Cette licence prend fin automatiquement en cas de violation
+des termes. A la resiliation, vous devez cesser toute
+utilisation et desinstaller le Logiciel.
+
+-----------------------------------------------------------
+9. DUREE
+-----------------------------------------------------------
+
+La licence est valable pour la duree indiquee lors de
+l'achat (10 jours, 1 mois, 1 an, 10 ans ou a vie).
+
+-----------------------------------------------------------
+10. DROIT APPLICABLE
+-----------------------------------------------------------
+
+Ce contrat est regi par le droit tunisien. Tout litige
+sera soumis aux tribunaux competents de Sfax, Tunisie.
+
+-----------------------------------------------------------
+11. CONTACT
+-----------------------------------------------------------
+
+Email : support@ton-entreprise.com
+Site : https://accounting-ai-automation.vercel.app
+
+-----------------------------------------------------------
+EN CLIQUANT SUR "J'ACCEPTE", VOUS CONFIRMEZ AVOIR LU ET
+ACCEPTE L'ENSEMBLE DES CONDITIONS CI-DESSUS.
+
+(c) 2026 Elec-Connect. Tous droits reserves.
+===========================================================

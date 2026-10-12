@@ -5,6 +5,30 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 // ═══════════════════════════════════════════════════════════════
+//  LECTURE DE LA CLÉ GROQ (DB prioritaire, fallback env)
+// ═══════════════════════════════════════════════════════════════
+
+async function getGroqApiKey(supabase: any): Promise<string | null> {
+  // 1. Essayer la table settings (priorité)
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "groq_api_key")
+      .maybeSingle();
+
+    if (data?.value && data.value.trim().length > 0) {
+      return data.value.trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. Fallback sur process.env
+  return process.env.GROQ_API_KEY ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  DÉFINITION DES TOOLS (Function Calling)
 // ═══════════════════════════════════════════════════════════════
 
@@ -109,8 +133,6 @@ const tools = [
 //  IMPLÉMENTATION DES TOOLS
 // ═══════════════════════════════════════════════════════════════
 
-// ─── Tool 1 : search_invoices ───────────────────────────────────
-
 async function searchInvoices(
   supabase: any,
   args: {
@@ -195,8 +217,6 @@ async function searchInvoices(
   };
 }
 
-// ─── Tool 2 : get_stats ─────────────────────────────────────────
-
 async function getStats(supabase: any, args: { period?: string }) {
   let query = supabase
     .from("documents")
@@ -238,8 +258,6 @@ async function getStats(supabase: any, args: { period?: string }) {
   };
 }
 
-// ─── Tool 3 : search_exceptions ─────────────────────────────────
-
 async function searchExceptions(supabase: any, args: { limit?: number }) {
   const { data, error } = await supabase
     .from("exceptions")
@@ -276,8 +294,6 @@ async function searchExceptions(supabase: any, args: { limit?: number }) {
     })),
   };
 }
-
-// ─── Tool 4 : get_supplier_summary ──────────────────────────────
 
 async function getSupplierSummary(supabase: any, args: { limit?: number }) {
   const { data, error } = await supabase
@@ -377,15 +393,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    // 3. ⭐ Récupérer la clé Groq depuis la DB ou env
+    const apiKey = await getGroqApiKey(supabase);
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY non configurée" },
-        { status: 500 }
+        {
+          error:
+            "Clé API Groq non configurée. Ajoutez-la dans Paramètres → Configuration.",
+        },
+        { status: 400 }
       );
     }
 
-    // 3. Conversation initiale
+    // 4. Conversation initiale
     const messages: any[] = [
       {
         role: "system",
@@ -407,11 +427,11 @@ RÈGLES :
       },
     ];
 
-    // 4. Premier appel à Groq
+    // 5. Premier appel à Groq
     const firstResponse = await callGroq(apiKey, messages, tools);
     const assistantMessage = firstResponse.choices[0].message;
 
-    // 5. Pas de tool call → réponse directe
+    // 6. Pas de tool call → réponse directe
     if (
       !assistantMessage.tool_calls ||
       assistantMessage.tool_calls.length === 0
@@ -423,7 +443,7 @@ RÈGLES :
       });
     }
 
-    // 6. Exécuter les tool calls
+    // 7. Exécuter les tool calls
     messages.push(assistantMessage);
 
     const executedTools: Array<{ name: string; args: any }> = [];
@@ -467,7 +487,7 @@ RÈGLES :
       });
     }
 
-    // 7. Appel final à Groq avec les résultats
+    // 8. Appel final à Groq avec les résultats
     const finalResponse = await callGroq(apiKey, messages, tools);
     const finalMessage = finalResponse.choices[0].message;
 

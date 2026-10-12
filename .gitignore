@@ -82,10 +82,14 @@ test_login.json
 *.bak
 
 # ═══════════════════════════════════════════════════════════════
-#  INSTALLEURS (à distribuer séparément)
+#  Package de build
 # ═══════════════════════════════════════════════════════════════
 installer.iss
-prerequisites/
-package/
+/package/
+/prerequisites/
 *.exe
 *.dmg
+*.msi
+
+# Fichiers sensibles
+.env.production

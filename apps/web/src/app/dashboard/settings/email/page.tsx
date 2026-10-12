@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
 
+
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
+    // ─── IA (Groq) — VISIBLE POUR TOUS ────────────
+    groq_api_key: "",
+
+    // ─── Email (Resend) — VISIBLE POUR TOUS ──────
     email_from: "",
     email_from_name: "",
     email_to: "",
     resend_api_key: "",
     custom_domain: "",
+
+    // ─── Super Admin uniquement ──────────────────
     cron_enabled: "false",
     cron_frequency: "weekly",
     cron_day: "monday",
@@ -18,7 +25,6 @@ export default function EmailSettingsPage() {
     cron_email_to: "",
     resend_webhook_secret: "",
     resend_inbound_domain: "",
-    // ✨ Relances automatiques
     reminder_enabled: "false",
     reminder_days: "3",
     reminder_max_count: "3",
@@ -91,48 +97,97 @@ export default function EmailSettingsPage() {
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
 
+        {/* Guide de configuration — VISIBLE POUR TOUS */}
+<div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
+  <div>
+    <p className="text-sm font-semibold text-blue-900">
+      📘 Guide de configuration
+    </p>
+    <p className="text-xs text-blue-700 mt-1">
+      Consultez la documentation pour créer vos variables d'environnement sur Vercel.
+    </p>
+  </div>
+  <a
+    href="/docs/environment-variables.html"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap text-sm font-semibold"
+  >
+    Ouvrir le guide ↗
+  </a>
+</div>
+
         {/* ═══════════════════════════════════════════
-            BOUTON GUIDE VARIABLES D'ENVIRONNEMENT
+            SECTION VARIABLES D'ENVIRONNEMENT
+            (SUPER ADMIN uniquement)
             ═══════════════════════════════════════════ */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-blue-900">
-              📘 Guide de configuration
+        
+            <h3
+              id="env-status"
+              className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
+            >
+              🔐 Variables d'environnement
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              État des variables d'environnement configurées sur Vercel.
+              Les variables critiques doivent être présentes pour que l'application fonctionne.
             </p>
-            <p className="text-xs text-blue-700 mt-1">
-              Consultez la documentation pour créer vos variables d'environnement sur Vercel.
-            </p>
-          </div>
+
+            <EnvironmentStatus />
+
+            <div className="border-b mt-8 mb-8"></div>
+          
+
+        {/* ═══════════════════════════════════════════
+            SECTION IA (GROQ) — VISIBLE POUR TOUS
+            ═══════════════════════════════════════════ */}
+        <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
+          🤖 Configuration IA (Groq)
+        </h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Configurez votre clé API Groq pour activer l'assistant IA et l'extraction
+          intelligente des documents. Obtenez une clé gratuite sur{" "}
           <a
-            href="/docs/environment-variables.html"
+            href="https://console.groq.com/keys"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap text-sm font-semibold"
+            className="text-blue-600 underline"
           >
-            Ouvrir le guide ↗
+            console.groq.com/keys
+          </a>
+        </p>
+
+        <div className="space-y-4 mb-8">
+          <div>
+            <label className="block text-sm font-semibold mb-1">
+              Clé API Groq
+            </label>
+            <input
+              type="password"
+              value={settings.groq_api_key}
+              onChange={(e) =>
+                setSettings({ ...settings, groq_api_key: e.target.value })
+              }
+              placeholder="gsk_..."
+              className="w-full border rounded px-3 py-2 font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Votre clé est stockée de manière sécurisée dans Supabase.
+            </p>
+          </div>
+
+          <a
+            href="https://console.groq.com/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
+          >
+            🔗 Obtenir une clé Groq
           </a>
         </div>
 
         {/* ═══════════════════════════════════════════
-            SECTION VARIABLES D'ENVIRONNEMENT
-            ═══════════════════════════════════════════ */}
-        <h3
-          id="env-status"
-          className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
-        >
-          🔐 Variables d'environnement
-        </h3>
-        <p className="text-sm text-gray-500 mb-6">
-          État des variables d'environnement configurées sur Vercel.
-          Les variables critiques doivent être présentes pour que l'application fonctionne.
-        </p>
-
-        <EnvironmentStatus />
-
-        <div className="border-b mt-8 mb-8"></div>
-
-        {/* ═══════════════════════════════════════════
-            SECTION EMAIL
+            SECTION EMAIL (RESEND) — VISIBLE POUR TOUS
             ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           📧 Configuration Email (Resend)
@@ -313,344 +368,338 @@ export default function EmailSettingsPage() {
             </p>
           </div>
 
-          {/* Section Webhook Resend */}
-          <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
-            📥 Réception d'emails (Webhook Resend)
-          </h3>
-          <p className="text-sm text-gray-500 mb-6">
-            Configurez la réception automatique des factures par email.
-            Les documents reçus seront traités automatiquement par l'IA.
-          </p>
-
-          <div className="space-y-4">
-            {/* Domaine inbound */}
-            <div>
-              <label className="block text-sm font-semibold mb-1">
-                Domaine de réception (Inbound)
-              </label>
-              <input
-                type="text"
-                value={settings.resend_inbound_domain}
-                onChange={(e) =>
-                  setSettings({ ...settings, resend_inbound_domain: e.target.value })
-                }
-                placeholder="inbound.monentreprise.com"
-                className="w-full border rounded px-3 py-2"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                L'adresse email à laquelle vos clients enverront leurs factures.
-              </p>
-            </div>
-
-            {/* Secret webhook */}
-            <div>
-              <label className="block text-sm font-semibold mb-1">
-                Secret du Webhook (whsec_...)
-              </label>
-              <input
-                type="password"
-                value={settings.resend_webhook_secret}
-                onChange={(e) =>
-                  setSettings({ ...settings, resend_webhook_secret: e.target.value })
-                }
-                placeholder="whsec_..."
-                className="w-full border rounded px-3 py-2 font-mono text-sm"
-              />
-            </div>
-
-            {/* URL à copier dans Resend */}
-            <div>
-              <label className="block text-sm font-semibold mb-1">
-                URL du Webhook (à coller dans Resend)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`}
-                  className="w-full border rounded px-3 py-2 bg-gray-50 font-mono text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`
-                    );
-                    alert('✅ URL copiée !');
-                  }}
-                  className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 whitespace-nowrap"
-                >
-                  📋 Copier
-                </button>
-              </div>
-            </div>
-
-            {/* Instructions */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="font-bold text-blue-800 mb-2">
-                📋 Comment configurer le webhook sur Resend
+          {/* ═══════════════════════════════════════════
+              SECTION WEBHOOK RESEND
+              (SUPER ADMIN )
+              ═══════════════════════════════════════════ */}
+          
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+                📥 Réception d'emails (Webhook Resend)
               </h3>
-              <ol className="list-decimal list-inside text-sm text-blue-900 space-y-2">
-                <li>
-                  Connectez-vous sur{" "}
-                  <a
-                    href="https://resend.com/webhooks"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline font-semibold"
-                  >
-                    resend.com/webhooks
-                  </a>
-                </li>
-                <li>
-                  Cliquez sur <strong>Add Webhook</strong>.
-                </li>
-                <li>
-                  Collez l'URL ci-dessus dans le champ <strong>Endpoint URL</strong>.
-                </li>
-                <li>
-                  Sélectionnez l'événement <strong>email.received</strong>.
-                </li>
-                <li>
-                  Copiez le <strong>Signing Secret</strong> (whsec_...) et collez-le
-                  dans le champ "Secret du Webhook" ci-dessus.
-                </li>
-                <li>
-                  Cliquez sur <strong>Save</strong>, puis sur <strong>💾 Sauvegarder</strong> ici.
-                </li>
-              </ol>
-            </div>
-          </div>
+              <p className="text-sm text-gray-500 mb-6">
+                Configurez la réception automatique des factures par email.
+                Les documents reçus seront traités automatiquement par l'IA.
+              </p>
+
+              <div className="space-y-4">
+                {/* Domaine inbound */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Domaine de réception (Inbound)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.resend_inbound_domain}
+                    onChange={(e) =>
+                      setSettings({ ...settings, resend_inbound_domain: e.target.value })
+                    }
+                    placeholder="inbound.monentreprise.com"
+                    className="w-full border rounded px-3 py-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    L'adresse email à laquelle vos clients enverront leurs factures.
+                  </p>
+                </div>
+
+                {/* Secret webhook */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Secret du Webhook (whsec_...)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.resend_webhook_secret}
+                    onChange={(e) =>
+                      setSettings({ ...settings, resend_webhook_secret: e.target.value })
+                    }
+                    placeholder="whsec_..."
+                    className="w-full border rounded px-3 py-2 font-mono text-sm"
+                  />
+                </div>
+
+                {/* URL à copier dans Resend */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    URL du Webhook (à coller dans Resend)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`}
+                      className="w-full border rounded px-3 py-2 bg-gray-50 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`
+                        );
+                        alert('✅ URL copiée !');
+                      }}
+                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 whitespace-nowrap"
+                    >
+                      📋 Copier
+                    </button>
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="font-bold text-blue-800 mb-2">
+                    📋 Comment configurer le webhook sur Resend
+                  </h3>
+                  <ol className="list-decimal list-inside text-sm text-blue-900 space-y-2">
+                    <li>
+                      Connectez-vous sur{" "}
+                      <a
+                        href="https://resend.com/webhooks"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-semibold"
+                      >
+                        resend.com/webhooks
+                      </a>
+                    </li>
+                    <li>
+                      Cliquez sur <strong>Add Webhook</strong>.
+                    </li>
+                    <li>
+                      Collez l'URL ci-dessus dans le champ <strong>Endpoint URL</strong>.
+                    </li>
+                    <li>
+                      Sélectionnez l'événement <strong>email.received</strong>.
+                    </li>
+                    <li>
+                      Copiez le <strong>Signing Secret</strong> (whsec_...) et collez-le
+                      dans le champ "Secret du Webhook" ci-dessus.
+                    </li>
+                    <li>
+                      Cliquez sur <strong>Save</strong>, puis sur <strong>💾 Sauvegarder</strong> ici.
+                    </li>
+                  </ol>
+                </div>
+              </div>
+                  
         </div>
 
         {/* ═══════════════════════════════════════════
             SECTION RELANCES AUTOMATIQUES
+            (SUPER ADMIN uniquement)
             ═══════════════════════════════════════════ */}
-        <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
-          📧 Relances automatiques
-        </h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Relance automatiquement les documents bloqués en exception
-          depuis plusieurs jours. Utile pour ne rien oublier.
-        </p>
+        
+          
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+              📧 Relances automatiques
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Relance automatiquement les documents bloqués en exception
+              depuis plusieurs jours. Utile pour ne rien oublier.
+            </p>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="reminder_enabled"
-              checked={settings.reminder_enabled === "true"}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  reminder_enabled: e.target.checked ? "true" : "false",
-                })
-              }
-              className="w-5 h-5"
-            />
-            <label htmlFor="reminder_enabled" className="font-semibold">
-              Activer les relances automatiques
-            </label>
-          </div>
-
-          {settings.reminder_enabled === "true" && (
-            <>
-              {/* ✨ NOUVEAU : Heure de relance */}
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Heure d'envoi (UTC)
-                </label>
-                <select
-                  value={settings.reminder_hour}
-                  onChange={(e) =>
-                    setSettings({ ...settings, reminder_hour: e.target.value })
-                  }
-                  className="w-full border rounded px-3 py-2"
-                >
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const h = String(i).padStart(2, "0");
-                    return (
-                      <option key={h} value={h}>
-                        {h}:00 UTC
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Relancer après (jours)
-                </label>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
                 <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={settings.reminder_days}
-                  onChange={(e) =>
-                    setSettings({ ...settings, reminder_days: e.target.value })
-                  }
-                  className="w-full border rounded px-3 py-2"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Délai avant la première relance
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Nombre maximum de relances
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={settings.reminder_max_count}
+                  type="checkbox"
+                  id="reminder_enabled"
+                  checked={settings.reminder_enabled === "true"}
                   onChange={(e) =>
                     setSettings({
                       ...settings,
-                      reminder_max_count: e.target.value,
+                      reminder_enabled: e.target.checked ? "true" : "false",
                     })
                   }
-                  className="w-full border rounded px-3 py-2"
+                  className="w-5 h-5"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Au-delà, aucune relance ne sera envoyée
-                </p>
-              </div>
-
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                ℹ️ Les relances sont envoyées <strong>une fois par jour</strong> via
-                un cron Vercel. Nécessite que <code>/api/cron/send-reminders</code> existe
-                et soit configuré dans <code>vercel.json</code>.
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* ═══════════════════════════════════════════
-            SECTION CRON
-            ═══════════════════════════════════════════ */}
-        <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
-          ⏰ Envoi automatique (Cron)
-        </h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Configurez l'envoi automatique de rapports par email.
-        </p>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="cron_enabled"
-              checked={settings.cron_enabled === "true"}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  cron_enabled: e.target.checked ? "true" : "false",
-                })
-              }
-              className="w-5 h-5"
-            />
-            <label htmlFor="cron_enabled" className="font-semibold">
-              Activer l'envoi automatique
-            </label>
-          </div>
-
-          {settings.cron_enabled === "true" && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Fréquence
+                <label htmlFor="reminder_enabled" className="font-semibold">
+                  Activer les relances automatiques
                 </label>
-                <select
-                  value={settings.cron_frequency}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      cron_frequency: e.target.value,
-                    })
-                  }
-                  className="w-full border rounded px-3 py-2"
-                >
-                  <option value="daily">Quotidien</option>
-                  <option value="weekly">Hebdomadaire</option>
-                  <option value="monthly">Mensuel</option>
-                </select>
               </div>
 
-              {settings.cron_frequency === "weekly" && (
-                <div>
-                  <label className="block text-sm font-semibold mb-1">
-                    Jour
-                  </label>
-                  <select
-                    value={settings.cron_day}
-                    onChange={(e) =>
-                      setSettings({ ...settings, cron_day: e.target.value })
-                    }
-                    className="w-full border rounded px-3 py-2"
-                  >
-                    <option value="monday">Lundi</option>
-                    <option value="tuesday">Mardi</option>
-                    <option value="wednesday">Mercredi</option>
-                    <option value="thursday">Jeudi</option>
-                    <option value="friday">Vendredi</option>
-                    <option value="saturday">Samedi</option>
-                    <option value="sunday">Dimanche</option>
-                  </select>
-                </div>
+              {settings.reminder_enabled === "true" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Heure d'envoi (UTC)
+                    </label>
+                    <select
+                      value={settings.reminder_hour}
+                      onChange={(e) =>
+                        setSettings({ ...settings, reminder_hour: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const h = String(i).padStart(2, "0");
+                        return (
+                          <option key={h} value={h}>
+                            {h}:00 UTC
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Relancer après (jours)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={settings.reminder_days}
+                      onChange={(e) =>
+                        setSettings({ ...settings, reminder_days: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Nombre maximum de relances
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={settings.reminder_max_count}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          reminder_max_count: e.target.value,
+                        })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                </>
               )}
+            </div>
+          
+          {/* ═══════════════════════════════════════════
+            SECTION CRON
+            (SUPER ADMIN uniquement)
+            ═══════════════════════════════════════════ */}
+        
+            <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
+              ⏰ Envoi automatique (Cron)
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Configurez l'envoi automatique de rapports par email.
+            </p>
 
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Heure d'envoi (UTC)
-                </label>
-                <select
-                  value={settings.cron_hour}
-                  onChange={(e) =>
-                    setSettings({ ...settings, cron_hour: e.target.value })
-                  }
-                  className="w-full border rounded px-3 py-2"
-                >
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const h = String(i).padStart(2, "0");
-                    return (
-                      <option key={h} value={h}>
-                        {h}:00 UTC
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Email destinataire
-                </label>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
                 <input
-                  type="email"
-                  value={settings.cron_email_to}
+                  type="checkbox"
+                  id="cron_enabled"
+                  checked={settings.cron_enabled === "true"}
                   onChange={(e) =>
                     setSettings({
                       ...settings,
-                      cron_email_to: e.target.value,
+                      cron_enabled: e.target.checked ? "true" : "false",
                     })
                   }
-                  placeholder="comptable@example.com"
-                  className="w-full border rounded px-3 py-2"
+                  className="w-5 h-5"
                 />
+                <label htmlFor="cron_enabled" className="font-semibold">
+                  Activer l'envoi automatique
+                </label>
               </div>
-            </>
-          )}
-        </div>
 
+              {settings.cron_enabled === "true" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Fréquence
+                    </label>
+                    <select
+                      value={settings.cron_frequency}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          cron_frequency: e.target.value,
+                        })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="daily">Quotidien</option>
+                      <option value="weekly">Hebdomadaire</option>
+                      <option value="monthly">Mensuel</option>
+                    </select>
+                  </div>
+
+                  {settings.cron_frequency === "weekly" && (
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">
+                        Jour
+                      </label>
+                      <select
+                        value={settings.cron_day}
+                        onChange={(e) =>
+                          setSettings({ ...settings, cron_day: e.target.value })
+                        }
+                        className="w-full border rounded px-3 py-2"
+                      >
+                        <option value="monday">Lundi</option>
+                        <option value="tuesday">Mardi</option>
+                        <option value="wednesday">Mercredi</option>
+                        <option value="thursday">Jeudi</option>
+                        <option value="friday">Vendredi</option>
+                        <option value="saturday">Samedi</option>
+                        <option value="sunday">Dimanche</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Heure d'envoi (UTC)
+                    </label>
+                    <select
+                      value={settings.cron_hour}
+                      onChange={(e) =>
+                        setSettings({ ...settings, cron_hour: e.target.value })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const h = String(i).padStart(2, "0");
+                        return (
+                          <option key={h} value={h}>
+                            {h}:00 UTC
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">
+                      Email destinataire
+                    </label>
+                    <input
+                      type="email"
+                      value={settings.cron_email_to}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          cron_email_to: e.target.value,
+                        })
+                      }
+                      placeholder="comptable@example.com"
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+        
         {/* Message de statut */}
         {message && (
           <div
