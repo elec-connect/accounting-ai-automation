@@ -147,10 +147,17 @@ export async function POST(request: Request) {
           );
         }
 
-        licenseData = {
-          duration_type: cloudResponse.license!.duration_type,
-          expires_at: cloudResponse.license!.expires_at,
-        };
+        if (!cloudResponse.license) {
+  return NextResponse.json(
+    { error: 'Réponse invalide du serveur Cloud' },
+    { status: 502 }
+  );
+}
+
+licenseData = {
+  duration_type: cloudResponse.license.duration_type,
+  expires_at: cloudResponse.license.expires_at,
+};
       } catch (cloudError) {
         console.error('Cloud verify error:', cloudError);
         return NextResponse.json(
