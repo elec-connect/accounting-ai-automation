@@ -30,6 +30,9 @@ export function LoginForm() {
       return;
     }
 
+    // ⭐ Attendre que la session soit bien propagée dans les cookies
+    await supabase.auth.getSession();
+
     // ⭐ Vérifier si super-admin
     const { data: superAdmin } = await supabase
       .from('super_admins')
@@ -42,17 +45,26 @@ export function LoginForm() {
       ? '/super-admin/licenses'
       : redirect || '/dashboard';
 
-    // ⭐ Logger le login (avant la redirection)
-    await fetch('/api/audit/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'login',
-        details: { method: 'password' },
-      }),
-    }).catch(() => {
-      // Ignore les erreurs de log — on ne bloque pas le login
-    });
+    // ⭐ Logger le login (non-bloquant + gestion content-type)
+    try {
+      const res = await fetch('/api/audit/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          details: { method: 'password' },
+        }),
+      });
+
+      // ⚠️ Vérifier le content-type AVANT de parser en JSON
+      const contentType = res.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        await res.json();
+      }
+    } catch (logError) {
+      // Ne bloque jamais le login
+      console.warn('Audit log failed (non-blocking):', logError);
+    }
 
     // ⭐ Rediriger
     window.location.href = target;

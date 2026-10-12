@@ -1,0 +1,594 @@
+═══════════════════════════════════════════════════════════════════════════
+  GUIDE COMPLET - AUTO-HÉBERGEMENT SUPABASE
+  Pour Windows (PowerShell + Git Bash)
+  Date : 11 Octobre 2026
+═══════════════════════════════════════════════════════════════════════════
+
+TABLE DES MATIÈRES
+─────────────────────────────────────────────────────────────────────────
+1.  Prérequis
+2.  Installation de Docker Desktop
+3.  Cloner Supabase
+4.  Générer les secrets
+5.  Démarrer Supabase
+6.  Migrations de la base de données
+7.  Configuration de l'app Next.js
+8.  Vérifications et tests
+9.  Commandes utiles du quotidien
+10. Sauvegardes
+11. Dépannage
+12. Migration vers macOS
+13. Notes importantes
+
+
+═══════════════════════════════════════════════════════════════════════════
+1. PRÉREQUIS
+═══════════════════════════════════════════════════════════════════════════
+
+Logiciels nécessaires :
+  ✓ Docker Desktop (Windows/macOS)
+  ✓ Git pour Windows (inclut Git Bash)
+  ✓ Node.js + pnpm
+  ✓ WSL 2 (Windows uniquement)
+
+Configuration minimale :
+  ✓ RAM    : 8 GB recommandé
+  ✓ CPU    : 4 cœurs recommandé
+  ✓ Disque : 80 GB+ SSD recommandé
+
+Chemins utilisés dans ce guide :
+  • Dossier Supabase : C:\Users\Sahnoun HAWALA\supabase-project
+  • Dossier app web  : C:\Projects\accounting-ai-automation\apps\web
+  • Dossier migrations : C:\Projects\accounting-ai-automation\infra\supabase\migrations
+
+
+═══════════════════════════════════════════════════════════════════════════
+2. INSTALLATION DE DOCKER DESKTOP
+═══════════════════════════════════════════════════════════════════════════
+
+── SUR WINDOWS ───────────────────────────────────────────────────────────
+
+  1. Télécharger Docker Desktop :
+     https://www.docker.com/products/docker-desktop/
+
+  2. Lancer Docker Desktop Installer.exe
+     → Cocher "Use WSL 2 instead of Hyper-V"
+     → Suivre les instructions
+     → Redémarrer le PC si demandé
+
+  3. Ouvrir Docker Desktop (icône baleine dans la barre des tâches)
+
+  4. Vérifier WSL dans PowerShell :
+     wsl --version
+     wsl --update
+
+── SUR MACOS ─────────────────────────────────────────────────────────────
+
+  1. Télécharger Docker Desktop :
+     https://www.docker.com/products/docker-desktop/
+
+  2. Choisir la version :
+     → Apple Silicon (M1/M2/M3/M4) : "Mac with Apple Silicon"
+     → Intel                       : "Mac with Intel Chip"
+
+     Pour connaître : menu Apple → À propos de ce Mac
+
+  3. Ouvrir le .dmg et glisser Docker dans Applications
+
+  4. Lancer Docker depuis Applications (mot de passe demandé)
+
+
+═══════════════════════════════════════════════════════════════════════════
+3. CLONER SUPABASE
+═══════════════════════════════════════════════════════════════════════════
+
+── POWERSHELL (Windows) ──────────────────────────────────────────────────
+
+  # Aller dans le dossier utilisateur
+  cd "C:\Users\Sahnoun HAWALA"
+
+  # Cloner le dépôt Supabase
+  git clone --depth 1 https://github.com/supabase/supabase
+
+  # Créer le dossier de travail
+  mkdir supabase-project
+
+  # Copier les fichiers Docker
+  Copy-Item -Path "supabase\docker\*" -Destination "supabase-project" -Recurse -Force
+
+  # Copier le fichier .env
+  Copy-Item -Path "supabase\docker\.env.example" -Destination "supabase-project\.env" -Force
+
+  # Se déplacer dans le dossier
+  cd supabase-project
+
+── GIT BASH (optionnel) ──────────────────────────────────────────────────
+
+  cd /c/Users/"Sahnoun HAWALA"
+  git clone --depth 1 https://github.com/supabase/supabase
+  mkdir supabase-project
+  cp -rf supabase/docker/* supabase-project
+  cp supabase/docker/.env.example supabase-project/.env
+  cd supabase-project
+
+
+═══════════════════════════════════════════════════════════════════════════
+4. GÉNÉRER LES SECRETS
+═══════════════════════════════════════════════════════════════════════════
+
+IMPORTANT : Git Bash ou WSL obligatoire (le script est un .sh)
+
+── GIT BASH ──────────────────────────────────────────────────────────────
+
+  # Ouvrir Git Bash (menu Démarrer → Git Bash)
+  cd "/c/Users/Sahnoun HAWALA/supabase-project"
+
+  # Générer les clés
+  sh ./utils/generate-keys.sh
+
+  # Répondre "y" à la question "Update .env file?"
+
+── WSL ───────────────────────────────────────────────────────────────────
+
+  wsl
+  cd "/mnt/c/Users/Sahnoun HAWALA/supabase-project"
+  sh ./utils/generate-keys.sh
+
+── LES CLÉS GÉNÉRÉES ─────────────────────────────────────────────────────
+
+  Le script va créer et inscrire dans .env :
+    • JWT_SECRET
+    • ANON_KEY
+    • SERVICE_ROLE_KEY
+    • SECRET_KEY_BASE
+    • REALTIME_DB_ENC_KEY
+    • VAULT_ENC_KEY
+    • PG_META_CRYPTO_KEY
+    • LOGFLARE_PUBLIC_ACCESS_TOKEN
+    • LOGFLARE_PRIVATE_ACCESS_TOKEN
+    • S3_PROTOCOL_ACCESS_KEY_ID
+    • S3_PROTOCOL_ACCESS_KEY_SECRET
+    • MINIO_ROOT_PASSWORD
+    • POSTGRES_PASSWORD
+    • DASHBOARD_PASSWORD
+
+  ⚠️  NE JAMAIS PARTAGER CES CLÉS
+  ⚠️  NE JAMAIS COMMITTER LE FICHIER .env
+
+
+═══════════════════════════════════════════════════════════════════════════
+5. DÉMARRER SUPABASE
+═══════════════════════════════════════════════════════════════════════════
+
+── POWERSHELL ────────────────────────────────────────────────────────────
+
+  # Vérifier Docker
+  docker --version
+
+  # Aller dans le dossier
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+  # Télécharger les images (5-10 min la première fois)
+  docker compose pull
+
+  # Démarrer tous les services
+  docker compose up -d
+
+  # Attendre 1-2 minutes puis vérifier
+  Start-Sleep -Seconds 60
+  docker compose ps
+
+── RÉSULTAT ATTENDU ─────────────────────────────────────────────────────
+
+  Tous les conteneurs doivent être "Up" et "healthy" :
+    supabase-db              Up (healthy)
+    supabase-studio          Up (healthy)
+    supabase-envoy           Up (healthy)  0.0.0.0:8000->8000/tcp
+    supabase-auth            Up (healthy)
+    supabase-rest            Up (healthy)
+    supabase-storage         Up (healthy)
+    supabase-realtime        Up (healthy)
+    supabase-meta            Up (healthy)
+    supabase-pooler          Up (healthy)  0.0.0.0:5432->5432/tcp
+    supabase-imgproxy        Up (healthy)
+    supabase-edge-functions  Up (healthy)
+
+── ACCÈS ─────────────────────────────────────────────────────────────────
+
+  Studio  : http://localhost:8000
+  User    : supabase
+  Password: (DASHBOARD_PASSWORD généré à l'étape 4)
+
+  Pour récupérer le mot de passe :
+    Select-String -Path .env -Pattern "DASHBOARD_PASSWORD"
+
+
+═══════════════════════════════════════════════════════════════════════════
+6. MIGRATIONS DE LA BASE DE DONNÉES
+═══════════════════════════════════════════════════════════════════════════
+
+── CONCATÉNER TOUTES LES MIGRATIONS ─────────────────────────────────────
+
+  cd "C:\Projects\accounting-ai-automation\infra\supabase\migrations"
+
+  $output = "C:\Users\Sahnoun HAWALA\all_migrations.sql"
+
+  Get-ChildItem -Filter "*.sql" | Sort-Object Name | ForEach-Object {
+    "`n-- ═══════════════════════════════════════════════════════════════"
+    "--  Fichier : $($_.Name)"
+    "-- ═══════════════════════════════════════════════════════════════`n"
+    Get-Content $_.FullName -Raw
+  } | Out-File -FilePath $output -Encoding utf8
+
+── EXÉCUTER LES MIGRATIONS ──────────────────────────────────────────────
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+  # Copier dans le conteneur
+  docker cp "C:\Users\Sahnoun HAWALA\all_migrations.sql" supabase-db:/tmp/all_migrations.sql
+
+  # Exécuter
+  docker compose exec db psql -U postgres -d postgres -f /tmp/all_migrations.sql
+
+── SI ERREUR D'ORDRE (rls.sql avant profiles.sql) ───────────────────────
+
+  # Créer manuellement super_admins si manquante
+  docker compose exec db psql -U postgres -d postgres -c @"
+  CREATE TABLE IF NOT EXISTS public.super_admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_super_admins_email ON public.super_admins(email);
+  ALTER TABLE public.super_admins ENABLE ROW LEVEL SECURITY;
+  "@
+
+  # Ajouter le super-admin
+  docker compose exec db psql -U postgres -d postgres -c @"
+  INSERT INTO public.super_admins (email)
+  VALUES ('haouala18@gmail.com')
+  ON CONFLICT (email) DO NOTHING;
+
+  UPDATE public.profiles
+  SET role = 'super_admin'
+  WHERE email = 'haouala18@gmail.com';
+  "@
+
+  # Re-exécuter rls.sql
+  docker cp "C:\Projects\accounting-ai-automation\infra\supabase\migrations\20261005000006_rls.sql" supabase-db:/tmp/rls.sql
+  docker compose exec db psql -U postgres -d postgres -f /tmp/rls.sql
+
+── VÉRIFIER ─────────────────────────────────────────────────────────────
+
+  docker compose exec db psql -U postgres -d postgres -c "\dt public.*"
+
+  Résultat attendu (9 tables) :
+    audit_log
+    document_embeddings
+    documents
+    exceptions
+    extractions
+    licenses
+    profiles
+    settings
+    super_admins
+
+
+═══════════════════════════════════════════════════════════════════════════
+7. CONFIGURATION DE L'APP NEXT.JS
+═══════════════════════════════════════════════════════════════════════════
+
+── SAUVEGARDER LES ANCIENNES VALEURS ────────────────────────────────────
+
+  cd "C:\Projects\accounting-ai-automation\apps\web"
+  Copy-Item ".env.local" ".env.local.cloud.backup" -Force
+
+── MODIFIER .env.local ──────────────────────────────────────────────────
+
+  notepad .env.local
+
+  Remplacer les 3 lignes Supabase par :
+
+    NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY généré à l'étape 4>
+    SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY généré à l'étape 4>
+
+── REDÉMARRER NEXT.JS ───────────────────────────────────────────────────
+
+  # Ctrl+C sur le terminal Next.js
+  cd "C:\Projects\accounting-ai-automation\apps\web"
+  pnpm dev
+
+
+═══════════════════════════════════════════════════════════════════════════
+8. VÉRIFICATIONS ET TESTS
+═══════════════════════════════════════════════════════════════════════════
+
+── VÉRIFIER LA CONNEXION DB ─────────────────────────────────────────────
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+  # Lister les tables
+  docker compose exec db psql -U postgres -d postgres -c "\dt public.*"
+
+  # Voir les super_admins
+  docker compose exec db psql -U postgres -d postgres -c "SELECT * FROM super_admins;"
+
+  # Voir les profiles
+  docker compose exec db psql -U postgres -d postgres -c "SELECT email, role FROM profiles;"
+
+  # Voir les utilisateurs auth
+  docker compose exec db psql -U postgres -d postgres -c "SELECT id, email FROM auth.users;"
+
+── TESTER L'APP ─────────────────────────────────────────────────────────
+
+  Ouvrir : http://localhost:3000
+  Login  : haouala18@gmail.com
+  → Redirection vers /super-admin/licenses (car super-admin)
+
+── VÉRIFIER LES API ─────────────────────────────────────────────────────
+
+  Studio : http://localhost:8000
+  REST   : http://localhost:8000/rest/v1/
+  Auth   : http://localhost:8000/auth/v1/health
+
+
+═══════════════════════════════════════════════════════════════════════════
+9. COMMANDES UTILES DU QUOTIDIEN
+═══════════════════════════════════════════════════════════════════════════
+
+── DÉMARRAGE QUOTIDIEN ──────────────────────────────────────────────────
+
+  # 1. Lancer Docker Desktop (icône baleine)
+  # 2. Attendre qu'il soit prêt
+  # 3. Dans PowerShell :
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+  docker compose up -d
+
+── ÉTAT DES SERVICES ────────────────────────────────────────────────────
+
+  docker compose ps
+
+── LOGS EN TEMPS RÉEL ───────────────────────────────────────────────────
+
+  # Tous les services
+  docker compose logs -f
+
+  # Un service précis
+  docker compose logs -f supabase-db
+  docker compose logs -f supabase-auth
+  docker compose logs -f supabase-storage
+
+── ARRÊTER / REDÉMARRER ────────────────────────────────────────────────
+
+  # Arrêter (garde les données)
+  docker compose stop
+
+  # Redémarrer
+  docker compose start
+
+  # Redémarrer un service
+  docker compose restart supabase-db
+
+  # Arrêter + supprimer les conteneurs (garde les volumes)
+  docker compose down
+
+── ACCÈS À LA BASE ─────────────────────────────────────────────────────
+
+  # Prompt psql interactif
+  docker compose exec db psql -U postgres -d postgres
+
+  # Commandes psql utiles :
+    \dt public.*     → Lister les tables
+    \d table_name    → Décrire une table
+    \du              → Lister les utilisateurs
+    \l               → Lister les databases
+    \q               → Quitter
+
+── ACCÈS DIRECT POSTGRESQL ─────────────────────────────────────────────
+
+  Depuis un client PostgreSQL (DBeaver, pgAdmin, TablePlus) :
+
+    Host     : localhost
+    Port     : 5432
+    Database : postgres
+    User     : postgres
+    Password : (POSTGRES_PASSWORD du .env)
+
+
+═══════════════════════════════════════════════════════════════════════════
+10. SAUVEGARDES
+═══════════════════════════════════════════════════════════════════════════
+
+── SAUVEGARDE DB ────────────────────────────────────────────────────────
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+  docker compose exec db pg_dump -U postgres postgres > "backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+
+── SAUVEGARDE STORAGE (fichiers uploadés) ───────────────────────────────
+
+  # Copier le dossier volumes/storage
+  $date = Get-Date -Format 'yyyyMMdd'
+  Copy-Item -Path "volumes\storage" -Destination "backup_storage_$date" -Recurse
+
+── RESTAURATION DB ──────────────────────────────────────────────────────
+
+  Get-Content "backup_20261011_120000.sql" | docker compose exec -T db psql -U postgres -d postgres
+
+── SAUVEGARDE COMPLÈTE (recommandée) ────────────────────────────────────
+
+  # 1. Sauvegarder la DB
+  docker compose exec db pg_dump -U postgres postgres > "backup_db_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+
+  # 2. Sauvegarder le .env
+  Copy-Item ".env" "env_backup_$(Get-Date -Format 'yyyyMMdd').txt"
+
+  # 3. Sauvegarder les fichiers uploadés
+  Copy-Item -Path "volumes\storage" -Destination "backup_storage_$(Get-Date -Format 'yyyyMMdd')" -Recurse
+
+
+═══════════════════════════════════════════════════════════════════════════
+11. DÉPANNAGE
+═══════════════════════════════════════════════════════════════════════════
+
+── ERREUR : "no configuration file provided" ────────────────────────────
+
+  Cause : Tu n'es pas dans le dossier supabase-project
+  Solution :
+    cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+── ERREUR : "port already in use" ───────────────────────────────────────
+
+  Cause : Un autre service utilise le port (3000, 8000, 5432, 6543)
+  Solution :
+    # Voir ce qui utilise le port 8000
+    netstat -ano | findstr :8000
+
+    # Tuer le processus (remplace PID par le numéro)
+    taskkill /PID <PID> /F
+
+── ERREUR : "Docker daemon is not running" ──────────────────────────────
+
+  Cause : Docker Desktop n'est pas lancé
+  Solution : Lancer Docker Desktop depuis le menu Démarrer
+
+── ERREUR : Conteneurs "unhealthy" ──────────────────────────────────────
+
+  Cause : Problème dans un service
+  Solution :
+    docker compose logs supabase-db
+    docker compose logs supabase-auth
+
+── ERREUR : "Unexpected token 'U'" sur le login ─────────────────────────
+
+  Cause : /api/audit/log retourne du texte brut au lieu de JSON
+  Solution : Vérifier que la route utilise NextResponse.json()
+
+── ERREUR : "relation public.X does not exist" ──────────────────────────
+
+  Cause : Migrations exécutées dans le mauvais ordre
+  Solution : Exécuter les migrations manquantes une par une
+
+── RESET COMPLET (⚠️ SUPPRIME TOUT) ────────────────────────────────────
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+  docker compose down -v
+
+  # Puis recommencer depuis l'étape 5
+
+
+═══════════════════════════════════════════════════════════════════════════
+12. MIGRATION VERS MACOS
+═══════════════════════════════════════════════════════════════════════════
+
+── ÉTAPE 1 : SUR WINDOWS — PRÉPARER LE TRANSFERT ────────────────────────
+
+  cd "C:\Users\Sahnoun HAWALA\supabase-project"
+
+  # 1. Sauvegarder la DB
+  docker compose exec db pg_dump -U postgres postgres > "transfer_db.sql"
+
+  # 2. Copier le dossier du projet (sans volumes/db/data)
+  #    → Copier tout SAUF "volumes\db\data" qui est spécifique à Windows
+
+── ÉTAPE 2 : SUR MACOS — INSTALLER ──────────────────────────────────────
+
+  # 1. Installer Docker Desktop pour Mac (Apple Silicon ou Intel)
+
+  # 2. Copier le dossier supabase-project
+
+  # 3. Ouvrir Terminal
+  cd ~/supabase-project
+
+  # 4. Vérifier que .env est présent (mêmes clés qu'avant)
+
+  # 5. Démarrer
+  docker compose up -d
+
+  # 6. Attendre 1-2 minutes
+  sleep 60
+  docker compose ps
+
+── ÉTAPE 3 : RESTAURER LA DB ────────────────────────────────────────────
+
+  # Copier le backup dans le conteneur
+  docker cp transfer_db.sql supabase-db:/tmp/transfer_db.sql
+
+  # Restaurer
+  docker compose exec db psql -U postgres -d postgres -f /tmp/transfer_db.sql
+
+── ÉTAPE 4 : CONFIGURER NEXT.JS SUR MAC ─────────────────────────────────
+
+  cd ~/Projects/accounting-ai-automation/apps/web
+  cp .env.local .env.local.cloud.backup
+  nano .env.local  # ou ton éditeur
+
+  # Mêmes valeurs que sur Windows
+  # NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
+  # NEXT_PUBLIC_SUPABASE_ANON_KEY=<même clé>
+  # SUPABASE_SERVICE_ROLE_KEY=<même clé>
+
+  pnpm dev
+
+
+═══════════════════════════════════════════════════════════════════════════
+13. NOTES IMPORTANTES
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️  SÉCURITÉ
+  • Ne JAMAIS committer le fichier .env
+  • Ne JAMAIS partager les clés (ANON_KEY, SERVICE_ROLE_KEY, POSTGRES_PASSWORD)
+  • Ne JAMAIS exposer ton instance sur Internet sans reverse proxy + HTTPS
+
+⚠️  DOCKER DESKTOP
+  • Doit rester allumé pour que Supabase fonctionne
+  • Après chaque redémarrage du PC : relancer Docker Desktop puis
+    "docker compose up -d"
+
+⚠️  PERSISTANCE
+  • Les données sont dans supabase-project\volumes\
+  • Sauvegarder régulièrement ce dossier
+  • La DB est dans volumes\db\data (ne pas éditer à la main)
+
+⚠️  PERFORMANCE
+  • Docker Desktop → Settings → Resources
+  • Allouer au minimum : 4 GB RAM, 2 CPU
+  • Recommandé : 8 GB RAM, 4 CPU
+
+⚠️  MISES À JOUR
+  • Pour mettre à jour Supabase :
+    docker compose pull
+    docker compose up -d
+
+⚠️  LIMITES DE L'AUTO-HÉBERGEMENT
+  • Pas de branches (comme en Cloud)
+  • Pas de PITR (Point-in-Time Recovery)
+  • Pas de métriques avancées
+  • Pas de management API
+  • Tu es responsable des sauvegardes et mises à jour
+
+⚠️  FICHIERS IMPORTANTS
+  • .env                        → Clés et configuration
+  • docker-compose.yml          → Configuration des services
+  • volumes/db/data             → Données PostgreSQL
+  • volumes/storage             → Fichiers uploadés (PDF, images)
+
+⚠️  URLS PAR DÉFAUT
+  • Studio          http://localhost:8000
+  • API REST        http://localhost:8000/rest/v1/
+  • API Auth        http://localhost:8000/auth/v1/
+  • API Storage     http://localhost:8000/storage/v1/
+  • PostgreSQL      localhost:5432
+  • Pooler          localhost:6543
+
+
+═══════════════════════════════════════════════════════════════════════════
+  FIN DU GUIDE
+═══════════════════════════════════════════════════════════════════════════
+
+Pour toute question, consulter :
+  • Documentation Supabase : https://supabase.com/docs/guides/self-hosting
+  • Docker : https://docs.docker.com/
+  • Dépôt GitHub : https://github.com/supabase/supabase

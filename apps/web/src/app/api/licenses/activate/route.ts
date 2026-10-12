@@ -1,145 +1,211 @@
-import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
-import { isValidLicenseFormat, calculateExpiry, type LicenseDuration } from '@/lib/license/generate';
-import { logAudit } from '@/lib/audit/log';
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { isValidLicenseFormat, calculateExpiry, type LicenseDuration } from "@/lib/license/generate";
+import { logAudit } from "@/lib/audit/log";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
+
+// ⭐ URL de TON API Cloud (à configurer dans .env.local)
+const CLOUD_VERIFY_URL =
+  process.env.LICENSE_VERIFY_URL ??
+  "https://ton-app.vercel.app/api/licenses/verify";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { key } = body as { key: string };
 
-    if (!key || typeof key !== 'string') {
-      return NextResponse.json({ error: 'Clé requise' }, { status: 400 });
+    if (!key || typeof key !== "string") {
+      return NextResponse.json({ error: "Clé requise" }, { status: 400 });
     }
 
     const normalizedKey = key.trim().toUpperCase();
 
-    // 1. Vérifier le format
+    // 1. Format
     if (!isValidLicenseFormat(normalizedKey)) {
       return NextResponse.json(
-        { error: 'Format de clé invalide' },
+        { error: "Format de clé invalide" },
         { status: 400 }
       );
     }
 
-    // 2. Vérifier l'authentification
+    // 2. Auth locale
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const admin = createAdminClient();
 
-    // 3. Chercher la licence
-    const { data: license, error: findError } = await admin
-      .from('licenses')
-      .select('*')
-      .eq('license_key', normalizedKey)
-      .single();
+    // 3. ⭐ VÉRIFICATION AUPRÈS DU CLOUD
+    let cloudResponse: {
+      valid: boolean;
+      license?: {
+        key: string;
+        duration_type: string;
+        expires_at: string | null;
+        activated_at: string;
+      };
+      reason?: string;
+      message?: string;
+    };
 
-    if (findError || !license) {
+    try {
+      const cloudRes = await fetch(CLOUD_VERIFY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: normalizedKey,
+          client_email: user.email,
+        }),
+      });
+
+      if (!cloudRes.ok) {
+        throw new Error(`Cloud API returned ${cloudRes.status}`);
+      }
+
+      cloudResponse = await cloudRes.json();
+    } catch (cloudError) {
+      console.error("Cloud verify error:", cloudError);
       return NextResponse.json(
-        { error: 'Clé de licence introuvable' },
-        { status: 404 }
+        {
+          error:
+            "Impossible de vérifier la licence. Vérifiez votre connexion internet.",
+        },
+        { status: 503 }
       );
     }
 
-    // 4. Vérifier le statut
-    if (license.status === 'revoked') {
+    // 4. Traiter la réponse du Cloud
+    if (!cloudResponse.valid) {
+      const reasonMessages: Record<string, string> = {
+        not_found: "Clé de licence introuvable",
+        revoked: "Cette licence a été révoquée",
+        suspended: "Cette licence est suspendue",
+        already_activated_by_other:
+          "Cette licence a déjà été activée par un autre compte",
+      };
+
       return NextResponse.json(
-        { error: 'Cette licence a été révoquée' },
+        {
+          error:
+            cloudResponse.message ??
+            reasonMessages[cloudResponse.reason ?? "not_found"] ??
+            "Licence invalide",
+        },
         { status: 403 }
       );
     }
 
-    if (license.status === 'suspended') {
-      return NextResponse.json(
-        { error: 'Cette licence est suspendue' },
-        { status: 403 }
-      );
-    }
+    // 5. Vérifier si déjà activée en local (idempotent)
+    const { data: existingLocal } = await admin
+      .from("licenses")
+      .select("*")
+      .eq("license_key", normalizedKey)
+      .maybeSingle();
 
-    // 5. Vérifier si déjà activée
-    if (license.activated_at) {
-      // Déjà activée par le même utilisateur → idempotent
-      if (license.activated_by === user.id) {
+    if (existingLocal?.activated_at) {
+      if (existingLocal.activated_by === user.id) {
         return NextResponse.json({
           success: true,
-          message: 'Licence déjà activée sur votre compte',
-          license,
+          message: "Licence déjà activée sur votre compte",
+          license: existingLocal,
         });
       }
 
-      // Déjà activée par un autre utilisateur
       return NextResponse.json(
-        { error: 'Cette licence est déjà activée' },
+        { error: "Cette licence est déjà activée" },
         { status: 403 }
       );
     }
 
-    // 6. Calculer l'expiration (à partir de maintenant)
-    const durationType = license.duration_type as LicenseDuration;
+    // 6. Calculer l'expiration
+    const durationType = cloudResponse.license!.duration_type as LicenseDuration;
     const expiry = calculateExpiry(durationType, new Date());
 
-    // 7. Activation ATOMIQUE
-    //    .is('activated_at', null) empêche 2 users d'activer en même temps
-    const { data: activated, error: updateError } = await admin
-      .from('licenses')
-      .update({
-        activated_at: new Date().toISOString(),
-        activated_by: user.id,
-        activated_by_email: user.email,
-        expires_at: expiry ? expiry.toISOString() : null,
-        status: 'active',
-      })
-      .eq('id', license.id)
-      .is('activated_at', null) // ⭐ garde-fou anti race-condition
-      .select()
-      .maybeSingle();
+    // 7. Insérer/mettre à jour en local
+    let activated;
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (existingLocal) {
+      // La licence existait mais pas activée → on l'active
+      const { data, error } = await admin
+        .from("licenses")
+        .update({
+          activated_at: new Date().toISOString(),
+          activated_by: user.id,
+          activated_by_email: user.email,
+          expires_at: expiry ? expiry.toISOString() : null,
+          status: "active",
+          duration_type: durationType,
+        })
+        .eq("id", existingLocal.id)
+        .is("activated_at", null)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      activated = data;
+    } else {
+      // La licence n'existe pas en local → on la crée
+      const { data, error } = await admin
+        .from("licenses")
+        .insert({
+          license_key: normalizedKey,
+          duration_type: durationType,
+          status: "active",
+          activated_at: new Date().toISOString(),
+          activated_by: user.id,
+          activated_by_email: user.email,
+          expires_at: expiry ? expiry.toISOString() : null,
+          notes: "Synchronisée depuis le Cloud",
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      activated = data;
     }
 
-    // ⭐ Si aucune ligne mise à jour → quelqu'un a activé entre-temps
     if (!activated) {
       return NextResponse.json(
-        { error: 'Cette licence vient d\'être activée par un autre compte' },
+        { error: "Cette licence vient d'être activée par un autre compte" },
         { status: 409 }
       );
     }
 
-    // ⭐ Logger l'activation
+    // 8. Log audit
     await logAudit({
       userId: user.id,
       userEmail: user.email,
-      action: 'license_activate',
-      entityType: 'license',
+      action: "license_activate",
+      entityType: "license",
       entityId: activated.id,
       details: {
         license_key: normalizedKey,
-        duration: activated.duration_type,
-        expires_at: activated.expires_at,
+        duration: durationType,
+        source: "cloud",
       },
       request,
     });
 
-    console.log(`✅ License activée : ${normalizedKey} par ${user.email}`);
-
     return NextResponse.json({
       success: true,
-      message: 'Licence activée avec succès',
+      message: "Licence activée avec succès",
       license: activated,
     });
   } catch (error) {
-    console.error('Activate license error:', error);
+    console.error("Activate license error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

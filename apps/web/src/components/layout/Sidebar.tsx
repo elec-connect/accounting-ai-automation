@@ -19,6 +19,10 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
+// ⭐ Feature flag
+const SUPER_ADMIN_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_SUPER_ADMIN === "true";
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -61,6 +65,9 @@ export function Sidebar() {
   const disabled = !license.loading && !license.valid;
   const role = profile?.role;
   const isAdmin = role === "admin" || role === "super_admin";
+
+  // ⭐ Super-admin visible seulement si feature activée
+  const showSuperAdmin = isSuperAdmin && SUPER_ADMIN_ENABLED;
 
   // ═══════════════════════════════════════════════════════════
   //  GROUPES DE LIENS
@@ -149,17 +156,17 @@ export function Sidebar() {
 
   const initials = email ? email.slice(0, 2).toUpperCase() : "??";
 
-  // ⭐ Nom affiché : full_name prioritaire, sinon "Super Admin", sinon email
-  const displayName = isSuperAdmin
-    ? (fullName || "Super Admin")
-    : (fullName || email || "—");
+  // ⭐ Nom affiché : full_name prioritaire, sinon email
+  const displayName = fullName || email || "—";
 
-  // ⭐ Rôle affiché : "Super Admin" si super-admin, sinon le rôle profiles
-  const roleLabel = isSuperAdmin
-    ? "Super Admin"
-    : role
-    ? ROLE_LABELS[role] ?? role
-    : "—";
+  // ⭐ Rôle affiché : "Super Admin" si super-admin (et flag activé),
+  //    sinon le rôle profiles
+  const roleLabel =
+    isSuperAdmin && SUPER_ADMIN_ENABLED
+      ? "Super Admin"
+      : role
+      ? ROLE_LABELS[role] ?? role
+      : "—";
 
   // ═══════════════════════════════════════════════════════════
   //  SIDEBAR
@@ -196,8 +203,8 @@ export function Sidebar() {
           <div className="space-y-1">{settingsLinks.map(renderLink)}</div>
         </div>
 
-        {/* ── SUPER ADMIN ── */}
-        {isSuperAdmin && (
+        {/* ── SUPER ADMIN (uniquement si flag activé) ── */}
+        {showSuperAdmin && (
           <div>
             <p className="px-3 mb-2 text-xs font-semibold text-purple-500 uppercase tracking-wider">
               Super Admin

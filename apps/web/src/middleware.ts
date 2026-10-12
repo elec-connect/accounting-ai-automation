@@ -28,6 +28,9 @@ const PUBLIC_ROUTES = [
   "/api/inbound-email",
   "/api/audit",
   "/api/reports",
+  "/api/licenses",    
+  "/api/me",         
+  "/api/ai",
 ];
 
 export async function middleware(request: NextRequest) {
