@@ -146,16 +146,17 @@ export async function POST(
     let totalSupplierCredit = 0;
 
     for (const e of allEntries ?? []) {
-      const debit = Number(e.debit) || 0;
-      const credit = Number(e.credit) || 0;
+  const debit = Number(e.debit) || 0;
+  const credit = Number(e.credit) || 0;
+  const account = String(e.account_number || '').trim(); // ⭐ Trim
 
-      if (e.account_number === '701') totalSales += credit;
-      if (e.account_number === '601') totalPurchases += debit;
-      if (e.account_number === '4457') totalTvaCollected += credit;
-      if (e.account_number === '4456') totalTvaDeductible += debit;
-      if (e.account_number === '411') totalClientDebit += debit;
-      if (e.account_number === '401') totalSupplierCredit += credit;
-    }
+  if (account === '701') totalSales += credit;
+  if (account === '601') totalPurchases += debit;
+  if (account === '4457') totalTvaCollected += credit;
+  if (account === '4456') totalTvaDeductible += debit;
+  if (account === '411') totalClientDebit += debit;
+  if (account === '401') totalSupplierCredit += credit;
+}
 
     const balance = totalClientDebit - totalSupplierCredit;
 

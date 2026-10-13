@@ -80,18 +80,34 @@ export async function GET(
       .sort((a, b) => a.account_number.localeCompare(b.account_number));
 
     // Partenaires
-    const partyMap = new Map<string, { type: string; debit: number; credit: number }>();
-    for (const e of entries ?? []) {
-      if (!e.party_name) continue;
-      const existing = partyMap.get(e.party_name) ?? {
-        type: e.party_type,
-        debit: 0,
-        credit: 0,
-      };
-      existing.debit += Number(e.debit) || 0;
-      existing.credit += Number(e.credit) || 0;
-      partyMap.set(e.party_name, existing);
-    }
+    const partyMap = new Map<
+  string,
+  { type: string; debit: number; credit: number }
+>();
+
+for (const e of entries ?? []) {
+  if (!e.party_name) continue;
+
+  const account = String(e.account_number || '').trim();
+  const debit = Number(e.debit) || 0;
+  const credit = Number(e.credit) || 0;
+
+  // ⭐ Pour un CLIENT : on ne compte QUE le compte 411
+  // ⭐ Pour un FOURNISSEUR : on ne compte QUE le compte 401
+  const isClientAccount = account === '411';
+  const isSupplierAccount = account === '401';
+
+  if (!isClientAccount && !isSupplierAccount) continue;
+
+  const existing = partyMap.get(e.party_name) ?? {
+    type: e.party_type,
+    debit: 0,
+    credit: 0,
+  };
+  existing.debit += debit;
+  existing.credit += credit;
+  partyMap.set(e.party_name, existing);
+}
 
     const parties = Array.from(partyMap.entries())
       .map(([party_name, data]) => ({
