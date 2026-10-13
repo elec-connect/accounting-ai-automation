@@ -91,6 +91,7 @@ export async function POST(
     let totalEntries = 0;
     let skipped = 0;
     let needsReview = 0;
+    let rejected = 0; 
     let excludedFromCalc = 0;
 
     // 5. Traiter chaque document
@@ -100,15 +101,25 @@ export async function POST(
           ? link.documents[0]
           : link.documents;
 
-        // ⭐⭐ OPTION 2 : IGNORER les documents à vérifier
-        if (link.needs_review) {
-          console.log(
-            `⚠️ ${doc?.original_filename ?? link.document_id} → IGNORÉ (à vérifier, non compté)`
-          );
-          needsReview++;
-          excludedFromCalc++;
-          continue; // ← On saute ce document
-        }
+        // ⭐ IGNORER les documents refusés
+if (link.confidence === 'rejected') {
+  console.log(
+    `❌ ${doc?.original_filename ?? link.document_id} → REFUSÉ (non compté)`
+  );
+  rejected++;
+  excludedFromCalc++;
+  continue;
+}
+
+// ⭐ IGNORER les documents à vérifier
+if (link.needs_review) {
+  console.log(
+    `⚠️ ${doc?.original_filename ?? link.document_id} → IGNORÉ (à vérifier, non compté)`
+  );
+  needsReview++;
+  excludedFromCalc++;
+  continue;
+}
 
         if (!doc) {
           skipped++;
@@ -224,6 +235,7 @@ export async function POST(
         documents_processed: processed,
         documents_skipped: skipped,
         documents_needs_review: needsReview,
+        documents_rejected: rejected, 
         documents_excluded: excludedFromCalc, // ⭐ NOUVEAU
         entries_created: totalEntries,
       },

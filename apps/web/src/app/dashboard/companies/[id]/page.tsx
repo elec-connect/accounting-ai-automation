@@ -61,8 +61,9 @@ export default function CompanyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [accepting, setAccepting] = useState<string | null>(null);
+  const [processing, setProcessing] = useState<string | null>(null);
   const [acceptingAll, setAcceptingAll] = useState(false);
+  const [rejectingAll, setRejectingAll] = useState(false);
 
   const hasCalculated = useRef(false);
 
@@ -93,6 +94,9 @@ export default function CompanyDetailPage() {
           `✅ Calculé : ${data.stats.documents_processed} documents, ${data.stats.entries_created} écritures` +
             (data.stats.documents_needs_review > 0
               ? ` — ⚠️ ${data.stats.documents_needs_review} à vérifier`
+              : "") +
+            (data.stats.documents_rejected > 0
+              ? ` — ❌ ${data.stats.documents_rejected} refusés`
               : "")
         );
         await loadData();
@@ -108,31 +112,58 @@ export default function CompanyDetailPage() {
     }
   }
 
-  // ⭐ Accepter UN document
+  // ⭐ Accepter
   async function handleAccept(linkId: string, filename: string) {
-    setAccepting(linkId);
-
+    setProcessing(linkId);
     try {
       const res = await fetch(`/api/document-companies/${linkId}/accept`, {
         method: "POST",
       });
-
       const data = await res.json();
-
       if (res.ok) {
         setMessage(`✅ ${filename} accepté`);
         await loadData();
+        await handleRecalculate();
       } else {
         setMessage(`❌ ${data.error}`);
       }
     } finally {
-      setAccepting(null);
+      setProcessing(null);
     }
   }
 
-  // ⭐ Accepter TOUS les documents
+  // ⭐ Refuser
+  async function handleReject(linkId: string, filename: string) {
+    if (
+      !confirm(
+        `❌ Refuser ${filename} ?\n\nCe document ne sera PAS compté dans la comptabilité.`
+      )
+    )
+      return;
+
+    setProcessing(linkId);
+    try {
+      const res = await fetch(`/api/document-companies/${linkId}/reject`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`❌ ${filename} refusé`);
+        await loadData();
+        await handleRecalculate();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  // ⭐ Accepter tout
   async function handleAcceptAll() {
-    const toAccept = documents.filter((d) => d.needs_review);
+    const toAccept = documents.filter(
+      (d) => d.needs_review && d.confidence !== "rejected"
+    );
     if (toAccept.length === 0) {
       setMessage("ℹ️ Aucun document à accepter");
       return;
@@ -141,21 +172,18 @@ export default function CompanyDetailPage() {
     if (
       !confirm(
         `Accepter les ${toAccept.length} document(s) à vérifier ?\n\n` +
-          `Ces documents seront comptabilisés comme fiables.`
+          `Ces documents seront comptabilisés.`
       )
     )
       return;
 
     setAcceptingAll(true);
     setMessage(null);
-
     try {
       const res = await fetch(`/api/companies/${id}/accept-all`, {
         method: "POST",
       });
-
       const data = await res.json();
-
       if (res.ok) {
         setMessage(`✅ ${data.message}`);
         await loadData();
@@ -168,20 +196,54 @@ export default function CompanyDetailPage() {
     }
   }
 
+  // ⭐ Refuser tout
+  async function handleRejectAll() {
+    const toReject = documents.filter(
+      (d) => d.needs_review && d.confidence !== "rejected"
+    );
+    if (toReject.length === 0) {
+      setMessage("ℹ️ Aucun document à refuser");
+      return;
+    }
+
+    if (
+      !confirm(
+        `❌ Refuser les ${toReject.length} document(s) à vérifier ?\n\n` +
+          `Ces documents ne seront PAS comptabilisés.`
+      )
+    )
+      return;
+
+    setRejectingAll(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/companies/${id}/reject-all`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`❌ ${data.message}`);
+        await loadData();
+        await handleRecalculate();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setRejectingAll(false);
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
-
     hasCalculated.current = false;
 
     async function init() {
       await loadData();
-
       if (!hasCalculated.current) {
         hasCalculated.current = true;
         await handleRecalculate();
       }
     }
-
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -195,8 +257,12 @@ export default function CompanyDetailPage() {
   const totalTvaCollected = Number(company.total_tva_collected ?? 0);
   const totalTvaDeductible = Number(company.total_tva_deductible ?? 0);
 
-  const needsReviewDocs = documents.filter((d) => d.needs_review);
+  const needsReviewDocs = documents.filter(
+    (d) => d.needs_review && d.confidence !== "rejected"
+  );
+  const rejectedDocs = documents.filter((d) => d.confidence === "rejected");
   const needsReviewCount = needsReviewDocs.length;
+  const rejectedCount = rejectedDocs.length;
 
   return (
     <main className="p-8 max-w-6xl">
@@ -240,34 +306,63 @@ export default function CompanyDetailPage() {
         </div>
       )}
 
+      {/* Bandeau documents à vérifier */}
       {needsReviewCount > 0 && (
-  <Card className="p-4 mb-6 bg-orange-50 border-orange-200">
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <span className="text-2xl">⚠️</span>
-        <div>
-          <p className="font-semibold text-orange-900">
-            {needsReviewCount} document(s) à vérifier
-          </p>
-          <p className="text-sm text-orange-700">
-            Ces documents ne sont <strong>PAS comptés</strong> dans la balance tant qu'ils ne sont pas acceptés.
-            Acceptez-les pour les inclure.
-          </p>
-        </div>
-      </div>
-      <button
-        onClick={handleAcceptAll}
-        disabled={acceptingAll}
-        className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
-      >
-        {acceptingAll
-          ? "⏳ Acceptation…"
-          : `✅ Accepter tout (${needsReviewCount})`}
-      </button>
-    </div>
-  </Card>
-)}
+        <Card className="p-4 mb-6 bg-orange-50 border-orange-200">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="font-semibold text-orange-900">
+                  {needsReviewCount} document(s) à vérifier
+                </p>
+                <p className="text-sm text-orange-700">
+                  Ces documents ne sont <strong>PAS comptés</strong> dans la balance tant qu'ils ne sont pas acceptés.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAcceptAll}
+                disabled={acceptingAll || rejectingAll}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {acceptingAll
+                  ? "⏳"
+                  : `✅ Accepter tout (${needsReviewCount})`}
+              </button>
+              <button
+                onClick={handleRejectAll}
+                disabled={acceptingAll || rejectingAll}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {rejectingAll
+                  ? "⏳"
+                  : `❌ Refuser tout (${needsReviewCount})`}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
 
+      {/* Bandeau documents refusés */}
+      {rejectedCount > 0 && (
+        <Card className="p-4 mb-6 bg-red-50 border-red-200">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">❌</span>
+            <div>
+              <p className="font-semibold text-red-900">
+                {rejectedCount} document(s) refusé(s)
+              </p>
+              <p className="text-sm text-red-700">
+                Ces documents ne sont PAS comptés dans la comptabilité.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Cartes résumé */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <p className="text-xs text-gray-500 uppercase mb-1">Ventes</p>
@@ -307,9 +402,9 @@ export default function CompanyDetailPage() {
         </Card>
       </div>
 
+      {/* Balance */}
       <Card className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">📋 Balance</h2>
-
         {balance.length === 0 ? (
           <p className="text-sm text-gray-500">Aucune écriture.</p>
         ) : (
@@ -352,11 +447,11 @@ export default function CompanyDetailPage() {
         )}
       </Card>
 
+      {/* Partenaires */}
       <Card className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">
           👥 Clients et fournisseurs
         </h2>
-
         {parties.length === 0 ? (
           <p className="text-sm text-gray-500">Aucun partenaire.</p>
         ) : (
@@ -397,6 +492,7 @@ export default function CompanyDetailPage() {
         )}
       </Card>
 
+      {/* Documents */}
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">
           📄 Documents liés ({documents.length})
@@ -413,72 +509,104 @@ export default function CompanyDetailPage() {
                 <th className="text-left p-2">Sens</th>
                 <th className="text-left p-2">Score</th>
                 <th className="text-left p-2">Statut</th>
-                <th className="text-left p-2">Action</th>
+                <th className="text-left p-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {documents.map((d) => (
-                <tr key={d.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">
-                    {d.documents ? (
-                      <Link
-                        href={`/dashboard/documents/${d.documents.id}`}
-                        className="text-blue-600 hover:underline"
+              {documents.map((d) => {
+                const isRejected = d.confidence === "rejected";
+                const isPending = d.needs_review && !isRejected;
+
+                return (
+                  <tr
+                    key={d.id}
+                    className={`border-b hover:bg-gray-50 ${
+                      isRejected ? "opacity-60" : ""
+                    }`}
+                  >
+                    <td className="p-2">
+                      {d.documents ? (
+                        <Link
+                          href={`/dashboard/documents/${d.documents.id}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {d.documents.original_filename}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {d.role === "issuer" ? "📤 Émetteur" : "📥 Destinataire"}
+                    </td>
+                    <td className="p-2">
+                      {d.direction === "issued" ? "Vente" : "Achat"}
+                    </td>
+                    <td className="p-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                          isRejected
+                            ? "bg-red-100 text-red-800"
+                            : d.confidence === "high"
+                            ? "bg-green-100 text-green-800"
+                            : d.confidence === "medium"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : d.confidence === "low"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
                       >
-                        {d.documents.original_filename}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {d.role === "issuer" ? "📤 Émetteur" : "📥 Destinataire"}
-                  </td>
-                  <td className="p-2">
-                    {d.direction === "issued" ? "Vente" : "Achat"}
-                  </td>
-                  <td className="p-2">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                        d.confidence === "high"
-                          ? "bg-green-100 text-green-800"
-                          : d.confidence === "medium"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : d.confidence === "low"
-                          ? "bg-orange-100 text-orange-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {d.match_score ?? 0}/3
-                    </span>
-                  </td>
-                  <td className="p-2">
-                    {d.needs_review ? (
-                      <span className="text-xs text-orange-700 font-semibold">
-                        ⚠️ À vérifier
+                        {isRejected ? "❌" : `${d.match_score ?? 0}/3`}
                       </span>
-                    ) : (
-                      <span className="text-xs text-green-700">✅ OK</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {d.needs_review && (
-                      <button
-                        onClick={() =>
-                          handleAccept(
-                            d.id,
-                            d.documents?.original_filename ?? ""
-                          )
-                        }
-                        disabled={accepting === d.id}
-                        className="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {accepting === d.id ? "⏳" : "✅ Accepter"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="p-2">
+                      {isRejected ? (
+                        <span className="text-xs text-red-700 font-semibold">
+                          ❌ Refusé
+                        </span>
+                      ) : isPending ? (
+                        <span className="text-xs text-orange-700 font-semibold">
+                          ⚠️ À vérifier
+                        </span>
+                      ) : (
+                        <span className="text-xs text-green-700">✅ OK</span>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {isPending && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() =>
+                              handleAccept(
+                                d.id,
+                                d.documents?.original_filename ?? ""
+                              )
+                            }
+                            disabled={processing === d.id}
+                            className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                            title="Accepter"
+                          >
+                            {processing === d.id ? "⏳" : "✅"}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleReject(
+                                d.id,
+                                d.documents?.original_filename ?? ""
+                              )
+                            }
+                            disabled={processing === d.id}
+                            className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            title="Refuser"
+                          >
+                            {processing === d.id ? "⏳" : "❌"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
