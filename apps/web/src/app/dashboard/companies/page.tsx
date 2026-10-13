@@ -9,9 +9,9 @@ type Company = {
   name: string;
   tax_id: string | null;
   email: string | null;
-  balance: number;
-  total_sales: number;
-  total_purchases: number;
+  balance: number | null;
+  total_sales: number | null;
+  total_purchases: number | null;
   last_calculated_at: string | null;
 };
 
@@ -20,6 +20,8 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rematching, setRematching] = useState(false);
+  const [rematchMessage, setRematchMessage] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     tax_id: "",
@@ -68,23 +70,72 @@ export default function CompaniesPage() {
     }
   }
 
+  async function handleRematchAll() {
+    if (
+      !confirm(
+        "🔄 Re-matcher TOUS les documents avec les entreprises ?\n\n" +
+          "Cela va :\n" +
+          "• Supprimer tous les liens actuels\n" +
+          "• Re-scanner chaque document\n" +
+          "• Créer de nouveaux liens selon les scores\n\n" +
+          "Continuer ?"
+      )
+    )
+      return;
+
+    setRematching(true);
+    setRematchMessage(null);
+
+    try {
+      const res = await fetch("/api/companies/rematch-all", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setRematchMessage(`✅ ${data.message}`);
+        await loadCompanies();
+      } else {
+        setRematchMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setRematching(false);
+    }
+  }
+
   if (loading) return <div className="p-8">Chargement…</div>;
 
   return (
     <main className="p-8 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">🏢 Entreprises gérées</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          {showForm ? "Annuler" : "➕ Nouvelle entreprise"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRematchAll}
+            disabled={rematching}
+            className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+          >
+            {rematching ? "⏳ Matching…" : "🔄 Re-matcher tout"}
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            {showForm ? "Annuler" : "➕ Nouvelle entreprise"}
+          </button>
+        </div>
       </div>
 
       {message && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
           {message}
+        </div>
+      )}
+
+      {rematchMessage && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+          {rematchMessage}
         </div>
       )}
 
@@ -147,9 +198,7 @@ export default function CompaniesPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1">
-                Adresse
-              </label>
+              <label className="block text-sm font-semibold mb-1">Adresse</label>
               <input
                 type="text"
                 value={form.address}
@@ -164,7 +213,7 @@ export default function CompaniesPage() {
               disabled={saving}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
             >
-              {saving ? "Création..." : "💾 Créer"}
+              {saving ? "Création…" : "💾 Créer"}
             </button>
           </form>
         </Card>
@@ -186,56 +235,63 @@ export default function CompaniesPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {companies.map((c) => (
-            <Link key={c.id} href={`/dashboard/companies/${c.id}`}>
-              <Card className="p-6 hover:shadow-lg hover:border-blue-300 transition cursor-pointer">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xl font-bold">
-                    {c.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                      c.balance >= 0
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {c.balance >= 0 ? "+" : ""}
-                    {c.balance.toFixed(3)} DT
-                  </span>
-                </div>
+          {companies.map((c) => {
+            // ⭐ Fallbacks pour éviter les erreurs
+            const balance = Number(c.balance ?? 0);
+            const totalSales = Number(c.total_sales ?? 0);
+            const totalPurchases = Number(c.total_purchases ?? 0);
 
-                <h3 className="font-bold text-lg mb-1">{c.name}</h3>
-                {c.tax_id && (
-                  <p className="text-xs text-gray-500 font-mono mb-2">
-                    MF: {c.tax_id}
-                  </p>
-                )}
-
-                <div className="mt-4 pt-4 border-t space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Ventes</span>
-                    <span className="font-semibold text-green-700">
-                      {c.total_sales.toFixed(3)} DT
+            return (
+              <Link key={c.id} href={`/dashboard/companies/${c.id}`}>
+                <Card className="p-6 hover:shadow-lg hover:border-blue-300 transition cursor-pointer">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xl font-bold">
+                      {c.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                        balance >= 0
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {balance >= 0 ? "+" : ""}
+                      {balance.toFixed(3)} DT
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Achats</span>
-                    <span className="font-semibold text-orange-700">
-                      {c.total_purchases.toFixed(3)} DT
-                    </span>
-                  </div>
-                </div>
 
-                {c.last_calculated_at && (
-                  <p className="text-xs text-gray-400 mt-3">
-                    Calculé :{" "}
-                    {new Date(c.last_calculated_at).toLocaleDateString("fr-FR")}
-                  </p>
-                )}
-              </Card>
-            </Link>
-          ))}
+                  <h3 className="font-bold text-lg mb-1">{c.name}</h3>
+                  {c.tax_id && (
+                    <p className="text-xs text-gray-500 font-mono mb-2">
+                      MF: {c.tax_id}
+                    </p>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Ventes</span>
+                      <span className="font-semibold text-green-700">
+                        {totalSales.toFixed(3)} DT
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Achats</span>
+                      <span className="font-semibold text-orange-700">
+                        {totalPurchases.toFixed(3)} DT
+                      </span>
+                    </div>
+                  </div>
+
+                  {c.last_calculated_at && (
+                    <p className="text-xs text-gray-400 mt-3">
+                      Calculé :{" "}
+                      {new Date(c.last_calculated_at).toLocaleDateString("fr-FR")}
+                    </p>
+                  )}
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </main>

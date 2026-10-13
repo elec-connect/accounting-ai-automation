@@ -26,11 +26,11 @@ type Company = {
   name: string;
   tax_id: string | null;
   email: string | null;
-  balance: number;
-  total_sales: number;
-  total_purchases: number;
-  total_tva_collected: number;
-  total_tva_deductible: number;
+  balance: number | null;
+  total_sales: number | null;
+  total_purchases: number | null;
+  total_tva_collected: number | null;
+  total_tva_deductible: number | null;
   last_calculated_at: string | null;
 };
 
@@ -38,8 +38,8 @@ type DocLink = {
   id: string;
   role: string;
   direction: string;
-  match_score: number;
-  confidence: string;
+  match_score: number | null;
+  confidence: string | null;
   needs_review: boolean;
   documents: {
     id: string;
@@ -106,6 +106,7 @@ export default function CompanyDetailPage() {
 
   useEffect(() => {
     if (id) loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // ⭐ Calcul automatique au chargement
@@ -118,6 +119,13 @@ export default function CompanyDetailPage() {
 
   if (loading) return <div className="p-8">Chargement…</div>;
   if (!company) return <div className="p-8">Entreprise introuvable</div>;
+
+  // ⭐ Fallbacks pour éviter les erreurs
+  const balanceTotal = Number(company.balance ?? 0);
+  const totalSales = Number(company.total_sales ?? 0);
+  const totalPurchases = Number(company.total_purchases ?? 0);
+  const totalTvaCollected = Number(company.total_tva_collected ?? 0);
+  const totalTvaDeductible = Number(company.total_tva_deductible ?? 0);
 
   const needsReview = documents.filter((d) => d.needs_review).length;
 
@@ -184,26 +192,26 @@ export default function CompanyDetailPage() {
         <Card className="p-4">
           <p className="text-xs text-gray-500 uppercase mb-1">Ventes</p>
           <p className="text-2xl font-bold text-green-700">
-            {company.total_sales.toFixed(3)} DT
+            {totalSales.toFixed(3)} DT
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-gray-500 uppercase mb-1">Achats</p>
           <p className="text-2xl font-bold text-orange-700">
-            {company.total_purchases.toFixed(3)} DT
+            {totalPurchases.toFixed(3)} DT
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-gray-500 uppercase mb-1">TVA</p>
           <p className="text-sm font-bold text-gray-700">
-            +{company.total_tva_collected.toFixed(3)}
+            +{totalTvaCollected.toFixed(3)}
             <br />
-            -{company.total_tva_deductible.toFixed(3)}
+            -{totalTvaDeductible.toFixed(3)}
           </p>
         </Card>
         <Card
           className={`p-4 ${
-            company.balance >= 0
+            balanceTotal >= 0
               ? "bg-green-50 border-green-200"
               : "bg-red-50 border-red-200"
           }`}
@@ -211,10 +219,10 @@ export default function CompanyDetailPage() {
           <p className="text-xs text-gray-500 uppercase mb-1">Solde</p>
           <p
             className={`text-2xl font-bold ${
-              company.balance >= 0 ? "text-green-700" : "text-red-700"
+              balanceTotal >= 0 ? "text-green-700" : "text-red-700"
             }`}
           >
-            {company.balance.toFixed(3)} DT
+            {balanceTotal.toFixed(3)} DT
           </p>
         </Card>
       </div>
@@ -241,17 +249,17 @@ export default function CompanyDetailPage() {
                   <td className="p-2 font-mono">{b.account_number}</td>
                   <td className="p-2">{b.account_label}</td>
                   <td className="p-2 text-right">
-                    {b.total_debit.toFixed(3)} DT
+                    {Number(b.total_debit ?? 0).toFixed(3)} DT
                   </td>
                   <td className="p-2 text-right">
-                    {b.total_credit.toFixed(3)} DT
+                    {Number(b.total_credit ?? 0).toFixed(3)} DT
                   </td>
                   <td
                     className={`p-2 text-right font-semibold ${
                       b.balance >= 0 ? "text-green-700" : "text-red-700"
                     }`}
                   >
-                    {b.balance.toFixed(3)} DT
+                    {Number(b.balance ?? 0).toFixed(3)} DT
                   </td>
                 </tr>
               ))}
@@ -286,17 +294,17 @@ export default function CompanyDetailPage() {
                     {p.party_type === "client" ? "👤 Client" : "🏢 Fournisseur"}
                   </td>
                   <td className="p-2 text-right">
-                    {p.total_debit.toFixed(3)} DT
+                    {Number(p.total_debit ?? 0).toFixed(3)} DT
                   </td>
                   <td className="p-2 text-right">
-                    {p.total_credit.toFixed(3)} DT
+                    {Number(p.total_credit ?? 0).toFixed(3)} DT
                   </td>
                   <td
                     className={`p-2 text-right font-semibold ${
                       p.balance >= 0 ? "text-green-700" : "text-red-700"
                     }`}
                   >
-                    {p.balance.toFixed(3)} DT
+                    {Number(p.balance ?? 0).toFixed(3)} DT
                   </td>
                 </tr>
               ))}
@@ -356,7 +364,7 @@ export default function CompanyDetailPage() {
                           : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {d.match_score}/3
+                      {d.match_score ?? 0}/3
                     </span>
                   </td>
                   <td className="p-2">
