@@ -1,235 +1,285 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 
-type Balance = {
-  account_number: string;
-  account_label: string;
-  total_debit: number;
-  total_credit: number;
-  balance: number;
+type Company = {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  email: string | null;
+  balance: number | null;
+  total_sales: number | null;
+  total_purchases: number | null;
+  total_tva_collected: number | null;
+  total_tva_deductible: number | null;
+  last_calculated_at: string | null;
 };
 
-type PartyBalance = {
-  party_name: string;
-  party_type: string;
-  total_debit: number;
-  total_credit: number;
-  balance: number;
-};
-
-export default function AccountingPage() {
-  const [balance, setBalance] = useState<Balance[]>([]);
-  const [parties, setParties] = useState<PartyBalance[]>([]);
+export default function AccountingDashboardPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  // ⭐ Nouveaux states
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenerateMessage, setRegenerateMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  async function loadData() {
+  async function loadCompanies() {
     setLoading(true);
-    const [balanceData, partiesData] = await Promise.all([
-      fetch("/api/accounting/balance").then((r) => r.json()),
-      fetch("/api/accounting/parties").then((r) => r.json()),
-    ]);
-    setBalance(balanceData.balance ?? []);
-    setParties(partiesData.parties ?? []);
+    const res = await fetch("/api/companies");
+    const data = await res.json();
+    setCompanies(data.companies ?? []);
     setLoading(false);
   }
 
   useEffect(() => {
-    loadData();
+    loadCompanies();
   }, []);
 
-  // ⭐ Fonction de régénération
-  async function handleRegenerate() {
-    const confirmed = confirm(
-      "Régénérer les écritures comptables pour TOUS les documents ?\n\n" +
-        "⚠️ Cela va :\n" +
-        "• Supprimer les écritures actuelles\n" +
-        "• Les recréer à partir des extractions existantes\n\n" +
-        "Continuer ?"
-    );
+  // ⭐ Recalculer TOUTES les entreprises
+  async function handleRecalculateAll() {
+    if (
+      !confirm(
+        `🔄 Recalculer TOUTES les ${companies.length} entreprises ?\n\n` +
+          "Cela va régénérer la comptabilité pour chaque entreprise."
+      )
+    )
+      return;
 
-    if (!confirmed) return;
-
-    setRegenerating(true);
-    setRegenerateMessage(null);
+    setRecalculating(true);
+    setMessage(null);
 
     try {
-      const res = await fetch("/api/accounting/regenerate", {
-        method: "POST",
-      });
+      let success = 0;
+      let failed = 0;
 
-      const data = await res.json();
-
-      if (res.ok) {
-        setRegenerateMessage({
-          type: "success",
-          text: `✅ ${data.message}`,
-        });
-        await loadData(); // Recharger les données
-      } else {
-        setRegenerateMessage({
-          type: "error",
-          text: `❌ ${data.error}`,
-        });
+      for (const company of companies) {
+        try {
+          const res = await fetch(
+            `/api/companies/${company.id}/recalculate`,
+            { method: "POST" }
+          );
+          if (res.ok) {
+            success++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
       }
-    } catch (err) {
-      setRegenerateMessage({
-        type: "error",
-        text: `❌ Erreur réseau : ${err instanceof Error ? err.message : "inconnue"}`,
-      });
+
+      setMessage(
+        `✅ ${success} entreprise(s) recalculée(s)` +
+          (failed > 0 ? ` — ❌ ${failed} échec(s)` : "")
+      );
+      await loadCompanies();
     } finally {
-      setRegenerating(false);
+      setRecalculating(false);
     }
   }
 
   if (loading) return <div className="p-8">Chargement…</div>;
 
+  // ⭐ Calculs des totaux globaux
+  const totalSales = companies.reduce(
+    (sum, c) => sum + Number(c.total_sales ?? 0),
+    0
+  );
+  const totalPurchases = companies.reduce(
+    (sum, c) => sum + Number(c.total_purchases ?? 0),
+    0
+  );
+  const totalTvaCollected = companies.reduce(
+    (sum, c) => sum + Number(c.total_tva_collected ?? 0),
+    0
+  );
+  const totalTvaDeductible = companies.reduce(
+    (sum, c) => sum + Number(c.total_tva_deductible ?? 0),
+    0
+  );
+  const totalBalance = companies.reduce(
+    (sum, c) => sum + Number(c.balance ?? 0),
+    0
+  );
+  const totalTva = totalTvaCollected - totalTvaDeductible;
+
+  // ⭐ Tri par solde décroissant
+  const sortedCompanies = [...companies].sort(
+    (a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0)
+  );
+
   return (
     <main className="p-8 max-w-6xl">
-      {/* Header avec bouton */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">📊 Comptabilité</h1>
-
-        {/* ⭐ Bouton Régénérer */}
+        <h1 className="text-2xl font-bold">📊 Tableau de bord comptable</h1>
         <button
-          onClick={handleRegenerate}
-          disabled={regenerating}
+          onClick={handleRecalculateAll}
+          disabled={recalculating || companies.length === 0}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
-          {regenerating ? (
+          {recalculating ? (
             <>
               <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Régénération…
+              Recalcul…
             </>
           ) : (
-            <>🔄 Régénérer les écritures</>
+            <>🔄 Recalculer tout ({companies.length})</>
           )}
         </button>
       </div>
 
-      {/* ⭐ Message de statut */}
-      {regenerateMessage && (
-        <div
-          className={`mb-6 p-4 rounded ${
-            regenerateMessage.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
-        >
-          {regenerateMessage.text}
+      {message && (
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+          {message}
         </div>
       )}
 
-      {/* Balance générale */}
-      <Card className="p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">📋 Balance générale</h2>
+      {/* ⭐ Totaux globaux */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <Card className="p-4 border-l-4 border-green-500">
+          <p className="text-xs text-gray-500 uppercase tracking-wide">
+            Ventes totales
+          </p>
+          <p className="text-2xl font-bold text-green-700 mt-1">
+            {totalSales.toFixed(3)} DT
+          </p>
+        </Card>
+        <Card className="p-4 border-l-4 border-orange-500">
+          <p className="text-xs text-gray-500 uppercase tracking-wide">
+            Achats totaux
+          </p>
+          <p className="text-2xl font-bold text-orange-700 mt-1">
+            {totalPurchases.toFixed(3)} DT
+          </p>
+        </Card>
+        <Card
+          className={`p-4 border-l-4 ${
+            totalTva >= 0 ? "border-blue-500" : "border-red-500"
+          }`}
+        >
+          <p className="text-xs text-gray-500 uppercase tracking-wide">
+            TVA nette
+          </p>
+          <p
+            className={`text-2xl font-bold mt-1 ${
+              totalTva >= 0 ? "text-blue-700" : "text-red-700"
+            }`}
+          >
+            {totalTva >= 0 ? "+" : ""}
+            {totalTva.toFixed(3)} DT
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            +{totalTvaCollected.toFixed(2)} / -{totalTvaDeductible.toFixed(2)}
+          </p>
+        </Card>
+        <Card
+          className={`p-4 border-l-4 ${
+            totalBalance >= 0 ? "border-green-500" : "border-red-500"
+          }`}
+        >
+          <p className="text-xs text-gray-500 uppercase tracking-wide">
+            Solde global
+          </p>
+          <p
+            className={`text-2xl font-bold mt-1 ${
+              totalBalance >= 0 ? "text-green-700" : "text-red-700"
+            }`}
+          >
+            {totalBalance >= 0 ? "+" : ""}
+            {totalBalance.toFixed(3)} DT
+          </p>
+        </Card>
+      </div>
 
-        {balance.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p className="text-3xl mb-2">📊</p>
-            <p className="font-semibold mb-1">Aucune écriture comptable</p>
-            <p className="text-sm mb-4">
-              Uploadez des documents ou cliquez sur "Régénérer les écritures".
-            </p>
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              🔄 Régénérer maintenant
-            </button>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b-2">
-              <tr>
-                <th className="text-left p-2">Compte</th>
-                <th className="text-left p-2">Libellé</th>
-                <th className="text-right p-2">Débit</th>
-                <th className="text-right p-2">Crédit</th>
-                <th className="text-right p-2">Solde</th>
-              </tr>
-            </thead>
-            <tbody>
-              {balance.map((b) => (
-                <tr key={b.account_number} className="border-b">
-                  <td className="p-2 font-mono">{b.account_number}</td>
-                  <td className="p-2">{b.account_label}</td>
-                  <td className="p-2 text-right">
-                    {b.total_debit.toFixed(3)} DT
-                  </td>
-                  <td className="p-2 text-right">
-                    {b.total_credit.toFixed(3)} DT
-                  </td>
-                  <td
-                    className={`p-2 text-right font-semibold ${
-                      b.balance >= 0 ? "text-green-700" : "text-red-700"
+      {/* ⭐ Entreprises */}
+      {companies.length === 0 ? (
+        <Card className="p-12 text-center">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold mb-2">Aucune entreprise</p>
+          <p className="text-sm text-gray-500 mb-4">
+            Créez vos entreprises pour commencer la comptabilité.
+          </p>
+          <Link
+            href="/dashboard/companies"
+            className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            🏢 Gérer les entreprises
+          </Link>
+        </Card>
+      ) : (
+        <>
+          <h2 className="text-lg font-semibold mb-4">
+            🏢 Entreprises gérées ({companies.length})
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedCompanies.map((c) => {
+              const balance = Number(c.balance ?? 0);
+              const sales = Number(c.total_sales ?? 0);
+              const purchases = Number(c.total_purchases ?? 0);
+              const isPositive = balance >= 0;
+
+              return (
+                <Link
+                  key={c.id}
+                  href={`/dashboard/companies/${c.id}`}
+                >
+                  <Card
+                    className={`p-5 hover:shadow-lg transition cursor-pointer border-l-4 ${
+                      isPositive ? "border-green-500" : "border-red-500"
                     }`}
                   >
-                    {b.balance.toFixed(3)} DT
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-bold text-lg">{c.name}</h3>
+                        {c.tax_id && (
+                          <p className="text-xs text-gray-500 font-mono">
+                            MF: {c.tax_id}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap ${
+                          isPositive
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {isPositive ? "+" : ""}
+                        {balance.toFixed(3)} DT
+                      </span>
+                    </div>
 
-      {/* Soldes clients / fournisseurs */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          👥 Soldes clients et fournisseurs
-        </h2>
+                    <div className="grid grid-cols-2 gap-2 text-xs mt-4 pt-3 border-t">
+                      <div>
+                        <p className="text-gray-500">Ventes</p>
+                        <p className="font-semibold text-green-700">
+                          {sales.toFixed(3)} DT
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Achats</p>
+                        <p className="font-semibold text-orange-700">
+                          {purchases.toFixed(3)} DT
+                        </p>
+                      </div>
+                    </div>
 
-        {parties.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p className="text-3xl mb-2">👥</p>
-            <p>Aucun client ou fournisseur enregistré</p>
+                    {c.last_calculated_at && (
+                      <p className="text-xs text-gray-400 mt-3">
+                        Calculé :{" "}
+                        {new Date(c.last_calculated_at).toLocaleDateString(
+                          "fr-FR"
+                        )}
+                      </p>
+                    )}
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b-2">
-              <tr>
-                <th className="text-left p-2">Partie</th>
-                <th className="text-left p-2">Type</th>
-                <th className="text-right p-2">Débit</th>
-                <th className="text-right p-2">Crédit</th>
-                <th className="text-right p-2">Solde</th>
-              </tr>
-            </thead>
-            <tbody>
-              {parties.map((p) => (
-                <tr key={p.party_name} className="border-b">
-                  <td className="p-2 font-medium">{p.party_name}</td>
-                  <td className="p-2">
-                    {p.party_type === "client" ? "👤 Client" : "🏢 Fournisseur"}
-                  </td>
-                  <td className="p-2 text-right">
-                    {p.total_debit.toFixed(3)} DT
-                  </td>
-                  <td className="p-2 text-right">
-                    {p.total_credit.toFixed(3)} DT
-                  </td>
-                  <td
-                    className={`p-2 text-right font-semibold ${
-                      p.balance >= 0 ? "text-green-700" : "text-red-700"
-                    }`}
-                  >
-                    {p.balance.toFixed(3)} DT
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+        </>
+      )}
     </main>
   );
 }
