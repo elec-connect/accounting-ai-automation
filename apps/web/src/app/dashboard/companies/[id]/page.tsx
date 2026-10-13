@@ -64,6 +64,7 @@ export default function CompanyDetailPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [acceptingAll, setAcceptingAll] = useState(false);
   const [rejectingAll, setRejectingAll] = useState(false);
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
 
   const hasCalculated = useRef(false);
 
@@ -259,6 +260,85 @@ async function handleRecover(linkId: string, filename: string) {
       setRejectingAll(false);
     }
   }
+  // ⭐ Export Excel
+async function handleExportExcel() {
+  setExporting('excel');
+  setMessage(null);
+
+  try {
+    const res = await fetch(`/api/companies/${id}/export/excel`);
+
+    if (!res.ok) {
+      const error = await res.json();
+      setMessage(`❌ ${error.error}`);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const contentDisposition = res.headers.get('content-disposition');
+    let filename = `bilan_${company?.name ?? 'company'}.xlsx`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+?)"/);
+      if (match) filename = match[1];
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    setMessage(`✅ Fichier Excel téléchargé`);
+  } catch (err) {
+    setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
+  } finally {
+    setExporting(null);
+  }
+}
+
+// ⭐ Export PDF
+async function handleExportPDF() {
+  setExporting('pdf');
+  setMessage(null);
+
+  try {
+    const res = await fetch(`/api/companies/${id}/export/pdf`);
+
+    if (!res.ok) {
+      const error = await res.json();
+      setMessage(`❌ ${error.error}`);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const contentDisposition = res.headers.get('content-disposition');
+    let filename = `bilan_${company?.name ?? 'company'}.pdf`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+?)"/);
+      if (match) filename = match[1];
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    setMessage(`✅ Fichier PDF téléchargé`);
+  } catch (err) {
+    setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
+  } finally {
+    setExporting(null);
+  }
+}
 
   useEffect(() => {
     if (!id) return;
@@ -300,32 +380,66 @@ async function handleRecover(linkId: string, filename: string) {
         ← Retour aux entreprises
       </Link>
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">🏢 {company.name}</h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            {company.tax_id && (
-              <span className="font-mono">MF: {company.tax_id}</span>
-            )}
-            {company.email && <span>{company.email}</span>}
-          </div>
-        </div>
+      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
+  <div>
+    <h1 className="text-3xl font-bold mb-2">🏢 {company.name}</h1>
+    <div className="flex items-center gap-3 text-sm text-gray-500">
+      {company.tax_id && (
+        <span className="font-mono">MF: {company.tax_id}</span>
+      )}
+      {company.email && <span>{company.email}</span>}
+    </div>
+  </div>
 
-        <button
-          onClick={handleRecalculate}
-          disabled={calculating}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-        >
-          {calculating ? (
-            <>
-              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Calcul en cours…
-            </>
-          ) : (
-            <>🔄 Recalculer</>
-          )}
-        </button>
-      </div>
+  <div className="flex gap-2 flex-wrap">
+    <button
+      onClick={handleExportExcel}
+      disabled={exporting !== null || balance.length === 0}
+      className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+      title="Télécharger la balance en Excel"
+    >
+      {exporting === 'excel' ? (
+        <>
+          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          Export…
+        </>
+      ) : (
+        <>📥 Excel</>
+      )}
+    </button>
+
+    <button
+      onClick={handleExportPDF}
+      disabled={exporting !== null || balance.length === 0}
+      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+      title="Télécharger la balance en PDF"
+    >
+      {exporting === 'pdf' ? (
+        <>
+          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          Export…
+        </>
+      ) : (
+        <>📄 PDF</>
+      )}
+    </button>
+
+    <button
+      onClick={handleRecalculate}
+      disabled={calculating || exporting !== null}
+      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+    >
+      {calculating ? (
+        <>
+          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          Calcul en cours…
+        </>
+      ) : (
+        <>🔄 Recalculer</>
+      )}
+    </button>
+  </div>
+</div>
 
       {message && (
         <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
