@@ -21,9 +21,20 @@ export type MatchResult = {
 //  MATCHING
 // ═══════════════════════════════════════════════════════════════
 
+// ⭐ Types comptables (uniquement les factures sont comptabilisées)
+const ACCOUNTING_TYPES = ['invoice']; // 'receipt' peut être ajouté si besoin
+
 export async function matchCompanies(
-  fields: ExtractedFields
+  fields: ExtractedFields,
+  documentType?: string
 ): Promise<MatchResult[]> {
+  // ⭐ Ne pas matcher les devis, proforma, bons de livraison, etc.
+  if (documentType && !ACCOUNTING_TYPES.includes(documentType)) {
+    console.log(
+      `⏭️ Type "${documentType}" non comptable → pas de matching entreprises`
+    );
+    return [];
+  }
   const admin = createAdminClient();
 
   const { data: companies } = await admin

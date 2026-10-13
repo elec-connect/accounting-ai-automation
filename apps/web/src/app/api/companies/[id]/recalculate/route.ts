@@ -91,38 +91,47 @@ export async function POST(
     let totalEntries = 0;
     let skipped = 0;
     let needsReview = 0;
-    let rejected = 0; 
+    let rejected = 0;
     let excludedFromCalc = 0;
+    let skippedByType = 0; // ⭐ NOUVEAU
 
     // 5. Traiter chaque document
     for (const link of docLinks ?? []) {
       try {
-        const doc = Array.isArray(link.documents)
-          ? link.documents[0]
-          : link.documents;
+        // ⭐ Extraire proprement le document (relation = tableau)
+        const docArray = Array.isArray(link.documents) ? link.documents : [];
+        const docName = docArray[0]?.original_filename ?? link.document_id;
 
         // ⭐ IGNORER les documents refusés
-if (link.confidence === 'rejected') {
-  console.log(
-    `❌ ${doc?.original_filename ?? link.document_id} → REFUSÉ (non compté)`
-  );
-  rejected++;
-  excludedFromCalc++;
-  continue;
-}
+        if (link.confidence === 'rejected') {
+          console.log(`❌ ${docName} → REFUSÉ (non compté)`);
+          rejected++;
+          excludedFromCalc++;
+          continue;
+        }
 
-// ⭐ IGNORER les documents à vérifier
-if (link.needs_review) {
-  console.log(
-    `⚠️ ${doc?.original_filename ?? link.document_id} → IGNORÉ (à vérifier, non compté)`
-  );
-  needsReview++;
-  excludedFromCalc++;
-  continue;
-}
+        // ⭐ IGNORER les documents à vérifier
+        if (link.needs_review) {
+          console.log(`⚠️ ${docName} → IGNORÉ (à vérifier, non compté)`);
+          needsReview++;
+          excludedFromCalc++;
+          continue;
+        }
+
+        const doc = docArray[0];
 
         if (!doc) {
           skipped++;
+          continue;
+        }
+
+        // ⭐⭐ IGNORER les non-factures (devis, proforma, bon de livraison, etc.)
+        const docType = String(doc.type || '').toLowerCase().trim();
+        if (docType !== 'invoice') {
+          console.log(
+            `⏭️ ${doc.original_filename} → type "${docType}" ignoré (seules les factures sont comptabilisées)`
+          );
+          skippedByType++;
           continue;
         }
 
@@ -202,6 +211,7 @@ if (link.needs_review) {
     console.log(`   Documents total       : ${docLinks?.length ?? 0}`);
     console.log(`   Documents traités     : ${processed}`);
     console.log(`   Documents ignorés     : ${skipped}`);
+    console.log(`   Documents non-factures: ${skippedByType} (NON comptés)`);
     console.log(`   Documents à vérifier  : ${needsReview} (NON comptés)`);
     console.log(`   Écritures créées      : ${totalEntries}`);
     console.log(`   ---`);
@@ -234,9 +244,10 @@ if (link.needs_review) {
         documents_total: docLinks?.length ?? 0,
         documents_processed: processed,
         documents_skipped: skipped,
+        documents_skipped_by_type: skippedByType, // ⭐ NOUVEAU
         documents_needs_review: needsReview,
-        documents_rejected: rejected, 
-        documents_excluded: excludedFromCalc, // ⭐ NOUVEAU
+        documents_rejected: rejected,
+        documents_excluded: excludedFromCalc,
         entries_created: totalEntries,
       },
       totals: {

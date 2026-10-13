@@ -298,11 +298,27 @@ export async function POST(
 }
 
 DÉTECTION DU TYPE (champ "type") :
-- "invoice" : Facture (mots-clés : "facture", "invoice", "montant total", "TVA")
-- "quote" : Devis (mots-clés : "devis", "quote", "proposition", "estimation")
-- "delivery_note" : Bon de livraison ("bon de livraison", "delivery note", "BL")
-- "receipt" : Reçu ("reçu", "receipt", "ticket")
+- "invoice" : FACTURE (document de vente/achat définitif avec montant à payer, TVA, numéro de facture)
+  Mots-clés : "facture", "invoice", "facture n°", "total à payer", "montant TTC", "TVA"
+  
+- "quote" : DEVIS (proposition commerciale, pas encore une facture)
+  Mots-clés : "devis", "quote", "proposition", "estimation", "offre", "valable jusqu'au"
+  
+- "delivery_note" : BON DE LIVRAISON (document de transport, pas de facturation)
+  Mots-clés : "bon de livraison", "delivery note", "BL", "livraison", "expédition"
+  
+- "receipt" : REÇU (preuve de paiement déjà effectué)
+  Mots-clés : "reçu", "receipt", "ticket", "paiement reçu", "acquitté"
+  
 - "other" : Tout autre document
+  (ex: contrat, attestation, document administratif, etc.)
+
+⚠️ IMPORTANT : 
+- Un DEVIS n'est PAS une facture
+- Un BON DE LIVRAISON n'est PAS une facture
+- Une FACTURE PROFORMA n'est PAS une facture définitive → mettre "quote" ou "other"
+- Un REÇU est une preuve de paiement (≠ facture)
+- Seul le type "invoice" sera comptabilisé
 
 DÉTECTION DES PARTIES :
 - "supplier_name" : Le nom de l'ENTREPRISE QUI ÉMET la facture (le vendeur, en haut du document)
@@ -434,7 +450,17 @@ ${rawText.slice(0, 8000)}`,
     try {
       console.log('🏢 Matching avec les entreprises...');
 
-      matchedCompanies = await matchCompanies(extractedFields as any);
+      // ⭐ Log : type de document
+      if (detectedType !== 'invoice') {
+        console.log(
+          `⏭️ Document de type "${detectedType}" → ignoré pour la comptabilité`
+        );
+      }
+
+      matchedCompanies = await matchCompanies(
+        extractedFields as any,
+        detectedType // ⭐ Passer le type détecté par l'IA
+      );
 
       if (matchedCompanies.length > 0) {
         console.log(
@@ -587,21 +613,23 @@ ${rawText.slice(0, 8000)}`,
           .eq('document_id', id);
       }
     } else {
-      // Fallback : génération sans company_id (comportement legacy)
-      try {
-        console.log('📊 Génération des écritures comptables (legacy)...');
-        accountingResult = await saveAccountingEntries(
-          id,
-          extractedFields as any
-        );
-
-        if (accountingResult.success) {
-          console.log(
-            `✅ ${accountingResult.count} écriture(s) générée(s)`
+      // ⭐ Fallback UNIQUEMENT pour les factures
+      if (detectedType === 'invoice') {
+        try {
+          console.log('📊 Génération des écritures comptables (legacy)...');
+          accountingResult = await saveAccountingEntries(
+            id,
+            extractedFields as any
           );
+
+          if (accountingResult.success) {
+            console.log(
+              `✅ ${accountingResult.count} écriture(s) générée(s)`
+            );
+          }
+        } catch (accError) {
+          console.error('Accounting entries failed:', accError);
         }
-      } catch (accError) {
-        console.error('Accounting entries failed:', accError);
       }
     }
 
