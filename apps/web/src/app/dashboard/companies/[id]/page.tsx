@@ -61,8 +61,9 @@ export default function CompanyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState<string | null>(null);
+  const [acceptingAll, setAcceptingAll] = useState(false);
 
-  // ⭐ Flag anti-boucle infinie
   const hasCalculated = useRef(false);
 
   async function loadData() {
@@ -107,18 +108,74 @@ export default function CompanyDetailPage() {
     }
   }
 
-  // ⭐ UN SEUL useEffect qui gère tout (pas de boucle)
+  // ⭐ Accepter UN document
+  async function handleAccept(linkId: string, filename: string) {
+    setAccepting(linkId);
+
+    try {
+      const res = await fetch(`/api/document-companies/${linkId}/accept`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage(`✅ ${filename} accepté`);
+        await loadData();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setAccepting(null);
+    }
+  }
+
+  // ⭐ Accepter TOUS les documents
+  async function handleAcceptAll() {
+    const toAccept = documents.filter((d) => d.needs_review);
+    if (toAccept.length === 0) {
+      setMessage("ℹ️ Aucun document à accepter");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Accepter les ${toAccept.length} document(s) à vérifier ?\n\n` +
+          `Ces documents seront comptabilisés comme fiables.`
+      )
+    )
+      return;
+
+    setAcceptingAll(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/companies/${id}/accept-all`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage(`✅ ${data.message}`);
+        await loadData();
+        await handleRecalculate();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setAcceptingAll(false);
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
 
-    // Réinitialiser le flag quand l'id change
     hasCalculated.current = false;
 
     async function init() {
-      // 1. Charger les données
       await loadData();
 
-      // 2. Calculer UNE SEULE FOIS (si pas déjà fait)
       if (!hasCalculated.current) {
         hasCalculated.current = true;
         await handleRecalculate();
@@ -132,14 +189,14 @@ export default function CompanyDetailPage() {
   if (loading) return <div className="p-8">Chargement…</div>;
   if (!company) return <div className="p-8">Entreprise introuvable</div>;
 
-  // ⭐ Fallbacks pour éviter les erreurs toFixed
   const balanceTotal = Number(company.balance ?? 0);
   const totalSales = Number(company.total_sales ?? 0);
   const totalPurchases = Number(company.total_purchases ?? 0);
   const totalTvaCollected = Number(company.total_tva_collected ?? 0);
   const totalTvaDeductible = Number(company.total_tva_deductible ?? 0);
 
-  const needsReview = documents.filter((d) => d.needs_review).length;
+  const needsReviewDocs = documents.filter((d) => d.needs_review);
+  const needsReviewCount = needsReviewDocs.length;
 
   return (
     <main className="p-8 max-w-6xl">
@@ -178,24 +235,35 @@ export default function CompanyDetailPage() {
       </div>
 
       {message && (
-        <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
           {message}
         </div>
       )}
 
-      {needsReview > 0 && (
+      {needsReviewCount > 0 && (
         <Card className="p-4 mb-6 bg-orange-50 border-orange-200">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div>
-              <p className="font-semibold text-orange-900">
-                {needsReview} document(s) à vérifier
-              </p>
-              <p className="text-sm text-orange-700">
-                La détection automatique a une confiance faible pour ces
-                documents.
-              </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="font-semibold text-orange-900">
+                  {needsReviewCount} document(s) à vérifier
+                </p>
+                <p className="text-sm text-orange-700">
+                  Vérifiez le sens (émetteur/destinataire) puis acceptez pour les
+                  inclure dans le calcul.
+                </p>
+              </div>
             </div>
+            <button
+              onClick={handleAcceptAll}
+              disabled={acceptingAll}
+              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              {acceptingAll
+                ? "⏳ Acceptation…"
+                : `✅ Accepter tout (${needsReviewCount})`}
+            </button>
           </div>
         </Card>
       )}
@@ -267,16 +335,16 @@ export default function CompanyDetailPage() {
                     {Number(b.total_credit ?? 0).toFixed(3)} DT
                   </td>
                   <td className="p-2 text-right font-semibold">
-  {b.balance >= 0 ? (
-    <span className="text-green-700">
-      {Number(b.balance).toFixed(3)} DT (Débit)
-    </span>
-  ) : (
-    <span className="text-blue-700">
-      {Math.abs(Number(b.balance)).toFixed(3)} DT (Crédit)
-    </span>
-  )}
-</td>
+                    {b.balance >= 0 ? (
+                      <span className="text-green-700">
+                        {Number(b.balance).toFixed(3)} DT (Débit)
+                      </span>
+                    ) : (
+                      <span className="text-blue-700">
+                        {Math.abs(Number(b.balance)).toFixed(3)} DT (Crédit)
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -345,11 +413,12 @@ export default function CompanyDetailPage() {
                 <th className="text-left p-2">Sens</th>
                 <th className="text-left p-2">Score</th>
                 <th className="text-left p-2">Statut</th>
+                <th className="text-left p-2">Action</th>
               </tr>
             </thead>
             <tbody>
               {documents.map((d) => (
-                <tr key={d.id} className="border-b">
+                <tr key={d.id} className="border-b hover:bg-gray-50">
                   <td className="p-2">
                     {d.documents ? (
                       <Link
@@ -390,6 +459,22 @@ export default function CompanyDetailPage() {
                       </span>
                     ) : (
                       <span className="text-xs text-green-700">✅ OK</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {d.needs_review && (
+                      <button
+                        onClick={() =>
+                          handleAccept(
+                            d.id,
+                            d.documents?.original_filename ?? ""
+                          )
+                        }
+                        disabled={accepting === d.id}
+                        className="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {accepting === d.id ? "⏳" : "✅ Accepter"}
+                      </button>
                     )}
                   </td>
                 </tr>
