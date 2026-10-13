@@ -65,9 +65,12 @@ export function DocumentList() {
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // ⭐ NOUVEAUX ÉTATS
+  const [extracting, setExtracting] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
 
   // ═══════════════════════════════════════════════════════════
-  //  Chargement — le spinner est optionnel
+  //  Chargement
   // ═══════════════════════════════════════════════════════════
   async function loadDocuments(options?: { showSpinner?: boolean }) {
     const showSpinner = options?.showSpinner ?? false;
@@ -90,15 +93,10 @@ export function DocumentList() {
     }
   }
 
-  // Chargement initial
   useEffect(() => {
     loadDocuments();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  //  Mise à jour du timestamp "now" toutes les 30s
-  //  → évite que les badges oscillent à chaque render
-  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -107,10 +105,6 @@ export function DocumentList() {
     return () => clearInterval(interval);
   }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  //  AUTO-REFRESH : uniquement si docs reçus < 2 min
-  //  Ne touche PAS à "refreshing" → pas de re-render du bouton
-  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
     const hasRecentPending = documents.some((d) => {
       if (d.status !== "received") return false;
@@ -121,11 +115,59 @@ export function DocumentList() {
     if (!hasRecentPending) return;
 
     const interval = setInterval(() => {
-      loadDocuments(); // Pas de spinner
+      loadDocuments();
     }, 5000);
 
     return () => clearInterval(interval);
   }, [documents, now]);
+
+  // ═══════════════════════════════════════════════════════════
+  //  EXTRAIRE UN DOCUMENT
+  // ═══════════════════════════════════════════════════════════
+  async function handleExtract(documentId: string, filename: string) {
+    setExtracting(documentId);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/documents/${documentId}/extract`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const entriesCount = data.accounting?.entriesCreated ?? 0;
+        const direction = data.accounting?.direction;
+        
+        let successText = `✅ ${filename} extrait avec succès`;
+        
+        if (entriesCount > 0) {
+          successText += ` — ${entriesCount} écriture(s) comptable(s)`;
+          if (direction) {
+            successText += ` (${direction === "issued" ? "Vente" : "Achat"})`;
+          }
+        }
+        
+        setMessage({ type: "success", text: successText });
+        await loadDocuments();
+      } else {
+        setMessage({
+          type: "error",
+          text: `❌ ${filename} : ${data.error || "Erreur d'extraction"}`,
+        });
+      }
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: `❌ Erreur réseau : ${
+          err instanceof Error ? err.message : "inconnue"
+        }`,
+      });
+    } finally {
+      setExtracting(null);
+      setTimeout(() => setMessage(null), 8000);
+    }
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer ce document ?")) return;
@@ -201,7 +243,6 @@ export function DocumentList() {
     other: documents.filter((d) => d.type === "other").length,
   };
 
-  // Compteurs basés sur "now" (stable)
   const recentPendingCount = documents.filter((d) => {
     if (d.status !== "received") return false;
     const age = now - new Date(d.created_at).getTime();
@@ -218,11 +259,24 @@ export function DocumentList() {
 
   return (
     <div>
-      {/* MODE DE TRAITEMENT + SEUIL DE CONFIANCE — 2 colonnes */}
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-  <PipelineModeToggle />
-  <ConfidenceThresholdInput />
-</div>
+      {/* MODE DE TRAITEMENT + SEUIL DE CONFIANCE */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <PipelineModeToggle />
+        <ConfidenceThresholdInput />
+      </div>
+
+      {/* ⭐ MESSAGE DE STATUT */}
+      {message && (
+        <div
+          className={`mb-4 p-3 rounded-lg border text-sm ${
+            message.type === "success"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
 
       {/* BANDEAU : Documents récents en cours */}
       {recentPendingCount > 0 && (
@@ -250,8 +304,7 @@ export function DocumentList() {
               {stuckCount > 1 ? "s" : ""} en traitement
             </p>
             <p className="text-xs text-red-700">
-              Ces documents ne sont pas traités automatiquement. Cliquez sur 👁️
-              pour les traiter manuellement.
+              Cliquez sur 🤖 Extraire pour les traiter manuellement.
             </p>
           </div>
         </div>
@@ -318,7 +371,6 @@ export function DocumentList() {
             📄 PDF
           </button>
 
-          {/* ⭐ Bouton Rafraîchir avec spinner OPTIONNEL */}
           <button
             onClick={() => loadDocuments({ showSpinner: true })}
             disabled={refreshing}
@@ -385,6 +437,17 @@ export function DocumentList() {
                   icon: "📄",
                 };
 
+                // ⭐ Détermine si on peut extraire/ré-extraire
+                const canExtract = doc.status === "received";
+                const canReExtract = [
+                  "extracted",
+                  "auto_approved",
+                  "exception",
+                  "approved",
+                  "delivered",
+                ].includes(doc.status);
+                const isExtracting = extracting === doc.id;
+
                 return (
                   <tr key={doc.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-sm">
@@ -414,7 +477,7 @@ export function DocumentList() {
                       )}
                     </td>
 
-                    {/* STATUT — utilise "now" stable */}
+                    {/* STATUT */}
                     <td className="p-3">
                       {doc.status === "received" ? (
                         (() => {
@@ -457,17 +520,58 @@ export function DocumentList() {
                     <td className="p-3 text-xs text-gray-500">
                       {new Date(doc.created_at).toLocaleString("fr-FR")}
                     </td>
+
+                    {/* ⭐ ACTIONS */}
                     <td className="p-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {/* 🤖 Bouton Extraire (statut = received) */}
+                        {canExtract && (
+                          <button
+                            onClick={() =>
+                              handleExtract(
+                                doc.id,
+                                doc.original_filename || "document"
+                              )
+                            }
+                            disabled={isExtracting}
+                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                            title="Extraire avec l'IA"
+                          >
+                            {isExtracting ? "⏳" : "🤖 Extraire"}
+                          </button>
+                        )}
+
+                        {/* 🔄 Bouton Ré-extraire (déjà extrait) */}
+                        {canReExtract && (
+                          <button
+                            onClick={() =>
+                              handleExtract(
+                                doc.id,
+                                doc.original_filename || "document"
+                              )
+                            }
+                            disabled={isExtracting}
+                            className="text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+                            title="Ré-extraire avec l'IA"
+                          >
+                            {isExtracting ? "⏳" : "🔄"}
+                          </button>
+                        )}
+
+                        {/* 👁️ Voir */}
                         <Link
                           href={`/dashboard/documents/${doc.id}`}
                           className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
+                          title="Voir le document"
                         >
                           👁️
                         </Link>
+
+                        {/* 🗑️ Supprimer */}
                         <button
                           onClick={() => handleDelete(doc.id)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50"
+                          title="Supprimer"
                         >
                           🗑️
                         </button>
