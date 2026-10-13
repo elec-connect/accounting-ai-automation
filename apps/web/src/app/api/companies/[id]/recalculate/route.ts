@@ -98,9 +98,13 @@ export async function POST(
     // 5. Traiter chaque document
     for (const link of docLinks ?? []) {
       try {
-        // ⭐ Extraire proprement le document (relation = tableau)
-        const docArray = Array.isArray(link.documents) ? link.documents : [];
-        const docName = docArray[0]?.original_filename ?? link.document_id;
+        // ⭐ Supabase peut retourner un objet OU un tableau selon la relation
+const docArray = Array.isArray(link.documents)
+  ? link.documents
+  : link.documents
+    ? [link.documents]
+    : [];
+const docName = docArray[0]?.original_filename ?? link.document_id;
 
         // ⭐ IGNORER les documents refusés
         if (link.confidence === 'rejected') {
