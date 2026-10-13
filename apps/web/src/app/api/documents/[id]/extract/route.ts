@@ -297,7 +297,9 @@ export async function POST(
   ]
 }
 
+═══════════════════════════════════════════════════════════════
 DÉTECTION DU TYPE (champ "type") :
+═══════════════════════════════════════════════════════════════
 - "invoice" : FACTURE (document de vente/achat définitif avec montant à payer, TVA, numéro de facture)
   Mots-clés : "facture", "invoice", "facture n°", "total à payer", "montant TTC", "TVA"
   
@@ -320,7 +322,9 @@ DÉTECTION DU TYPE (champ "type") :
 - Un REÇU est une preuve de paiement (≠ facture)
 - Seul le type "invoice" sera comptabilisé
 
+═══════════════════════════════════════════════════════════════
 DÉTECTION DES PARTIES :
+═══════════════════════════════════════════════════════════════
 - "supplier_name" : Le nom de l'ENTREPRISE QUI ÉMET la facture (le vendeur, en haut du document)
 - "customer_name" : Le nom du CLIENT / DESTINATAIRE (celui qui reçoit la facture)
 - "supplier_tax_id" : Le matricule fiscal de l'émetteur
@@ -328,20 +332,90 @@ DÉTECTION DES PARTIES :
 - "supplier_email" : L'email de l'émetteur
 - "customer_email" : L'email du destinataire
 
+═══════════════════════════════════════════════════════════════
+⚠️⚠️⚠️ RÈGLES DE CALCUL DES MONTANTS (TRÈS IMPORTANT) ⚠️⚠️⚠️
+═══════════════════════════════════════════════════════════════
+
+🎯 OBJECTIF : TOUJOURS remplir les 3 champs (HT, TVA, TTC) si possible.
+
+Formules à appliquer :
+- TVA = HT × taux / 100
+- TTC = HT + TVA
+- TTC = HT × (1 + taux / 100)
+- HT  = TTC / (1 + taux / 100)
+- HT  = TTC - TVA
+- TVA = TTC - HT
+
+Règles de calcul automatique :
+
+1️⃣ Si tu vois HT + TTC, mais PAS la TVA :
+   → total_vat = total_amount_ttc - total_amount_ht
+
+2️⃣ Si tu vois HT + taux TVA, mais PAS le TTC :
+   → total_vat = total_amount_ht × taux / 100
+   → total_amount_ttc = total_amount_ht + total_vat
+
+3️⃣ Si tu vois TTC + taux TVA, mais PAS le HT :
+   → total_amount_ht = total_amount_ttc / (1 + taux / 100)
+   → total_vat = total_amount_ttc - total_amount_ht
+
+4️⃣ Si tu vois TTC + HT, mais PAS le taux :
+   → taux = (total_amount_ttc - total_amount_ht) / total_amount_ht × 100
+
+5️⃣ Si tu vois HT seulement (pas de TVA, pas de TTC) :
+   → Cherche le taux TVA sur le document
+   → Si taux trouvé : calcule TVA et TTC
+   → Si taux introuvable : mets TVA = 0 et TTC = HT
+
+6️⃣ Si tu vois TTC seulement (pas de HT, pas de TVA, pas de taux) :
+   → Cherche le taux TVA sur le document
+   → Si taux = 19% : HT = TTC / 1.19, TVA = TTC - HT
+   → Si taux = 13% : HT = TTC / 1.13, TVA = TTC - HT
+   → Si taux = 7%  : HT = TTC / 1.07, TVA = TTC - HT
+   → Si taux introuvable : mets HT = TTC, TVA = 0
+
+7️⃣ Si tu vois les LINE_ITEMS avec des totaux :
+   → total_amount_ht = somme des totaux des lignes
+   → Puis applique les règles 1-6 pour TVA et TTC
+
+⚠️ NE JAMAIS laisser total_amount_ht, total_vat ou total_amount_ttc à null
+   SI tu peux le calculer à partir des autres champs.
+
+⚠️ Utilise null UNIQUEMENT si vraiment aucune information n'est disponible
+   (ex: document sans aucun montant).
+
+⚠️ ARRONDIS tous les montants à 3 décimales max.
+
+═══════════════════════════════════════════════════════════════
 DÉTECTION DU TAUX TVA (champ "tva_rate") :
-- 19 : Taux standard Tunisie
+═══════════════════════════════════════════════════════════════
+- 19 : Taux standard Tunisie (le plus courant)
 - 13 : Taux intermédiaire
 - 7 : Taux réduit
-- 0 : Exonéré
-Si le taux n'est pas visible, calcule : total_vat / total_amount_ht * 100
+- 0 : Exonéré (mais la facture peut exister)
 
+Si le taux n'est pas visible :
+- Calcule : tva_rate = total_vat / total_amount_ht × 100
+- Si le résultat est proche de 19, 13 ou 7 → utilise cette valeur
+- Sinon mets null
+
+═══════════════════════════════════════════════════════════════
 RÈGLES DE SCORING (confidence global 0-100) :
+═══════════════════════════════════════════════════════════════
 - 95-100 : tous les champs critiques présents, montants cohérents, document net
 - 80-94  : champs présents mais un doute léger sur un montant ou une date
 - 60-79  : plusieurs champs manquants ou ambigus
 - 0-59   : document non exploitable
 
-SUGGESTIONS : pour chaque champ dont le score est < 90, propose une valeur corrigée si tu détectes une erreur probable. Si aucune suggestion, retourne un tableau vide [].
+═══════════════════════════════════════════════════════════════
+SUGGESTIONS :
+═══════════════════════════════════════════════════════════════
+Pour chaque champ dont le score est < 90, propose une valeur corrigée si tu détectes une erreur probable. Si aucune suggestion, retourne un tableau vide [].
+
+Exemples de suggestions utiles :
+- Si HT et TTC sont fournis mais TVA manquante → suggérer TVA = TTC - HT
+- Si le total des line_items ≠ total_amount_ht → suggérer correction
+- Si le taux TVA semble faux (ex: 19% mais calcul donne 7%) → suggérer correction
 
 Texte du document :
 ${rawText.slice(0, 8000)}`,
