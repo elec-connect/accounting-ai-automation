@@ -241,32 +241,32 @@ export default function CompanyDetailPage() {
       )}
 
       {needsReviewCount > 0 && (
-        <Card className="p-4 mb-6 bg-orange-50 border-orange-200">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div>
-                <p className="font-semibold text-orange-900">
-                  {needsReviewCount} document(s) à vérifier
-                </p>
-                <p className="text-sm text-orange-700">
-                  Vérifiez le sens (émetteur/destinataire) puis acceptez pour les
-                  inclure dans le calcul.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleAcceptAll}
-              disabled={acceptingAll}
-              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
-            >
-              {acceptingAll
-                ? "⏳ Acceptation…"
-                : `✅ Accepter tout (${needsReviewCount})`}
-            </button>
-          </div>
-        </Card>
-      )}
+  <Card className="p-4 mb-6 bg-orange-50 border-orange-200">
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">⚠️</span>
+        <div>
+          <p className="font-semibold text-orange-900">
+            {needsReviewCount} document(s) à vérifier
+          </p>
+          <p className="text-sm text-orange-700">
+            Ces documents ne sont <strong>PAS comptés</strong> dans la balance tant qu'ils ne sont pas acceptés.
+            Acceptez-les pour les inclure.
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={handleAcceptAll}
+        disabled={acceptingAll}
+        className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+      >
+        {acceptingAll
+          ? "⏳ Acceptation…"
+          : `✅ Accepter tout (${needsReviewCount})`}
+      </button>
+    </div>
+  </Card>
+)}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">

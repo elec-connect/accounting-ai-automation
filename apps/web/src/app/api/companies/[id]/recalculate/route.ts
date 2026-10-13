@@ -16,7 +16,7 @@ export async function POST(
   try {
     const { id: companyId } = await params;
 
-    // ⭐ Nettoyer l'ID (retirer les espaces)
+    // ⭐ Nettoyer l'ID
     const cleanCompanyId = String(companyId).trim();
 
     console.log(`🔍 Recalcul pour company_id = "${cleanCompanyId}"`);
@@ -44,7 +44,7 @@ export async function POST(
       );
     }
 
-    // 3. Récupérer tous les documents liés à cette entreprise
+    // 3. Récupérer tous les documents liés
     const { data: docLinks, error: linksError } = await admin
       .from('document_companies')
       .select(`
@@ -73,13 +73,13 @@ export async function POST(
       `📊 Recalcul pour "${company.name}" : ${docLinks?.length ?? 0} documents liés`
     );
 
-    // 4. Supprimer les anciennes écritures de cette entreprise
+    // 4. Supprimer les anciennes écritures
     await admin
       .from('accounting_entries')
       .delete()
       .eq('company_id', cleanCompanyId);
 
-    // ⭐ Initialiser les totaux (calcul DIRECT pendant la boucle)
+    // Totaux
     let totalSales = 0;
     let totalPurchases = 0;
     let totalTvaCollected = 0;
@@ -91,6 +91,7 @@ export async function POST(
     let totalEntries = 0;
     let skipped = 0;
     let needsReview = 0;
+    let excludedFromCalc = 0;
 
     // 5. Traiter chaque document
     for (const link of docLinks ?? []) {
@@ -98,6 +99,16 @@ export async function POST(
         const doc = Array.isArray(link.documents)
           ? link.documents[0]
           : link.documents;
+
+        // ⭐⭐ OPTION 2 : IGNORER les documents à vérifier
+        if (link.needs_review) {
+          console.log(
+            `⚠️ ${doc?.original_filename ?? link.document_id} → IGNORÉ (à vérifier, non compté)`
+          );
+          needsReview++;
+          excludedFromCalc++;
+          continue; // ← On saute ce document
+        }
 
         if (!doc) {
           skipped++;
@@ -116,7 +127,7 @@ export async function POST(
           continue;
         }
 
-        // Générer les écritures selon le sens détecté
+        // Générer les écritures
         const entries = generateAccountingEntries(
           fields,
           'invoice',
@@ -146,7 +157,7 @@ export async function POST(
           continue;
         }
 
-        // ⭐ Calculer les totaux À PARTIR des entrées générées
+        // Calculer les totaux À PARTIR des entrées générées
         for (const e of entries) {
           const account = String(e.account_number || '').trim();
           const debit = Number(e.debit) || 0;
@@ -162,7 +173,6 @@ export async function POST(
 
         processed++;
         totalEntries += entries.length;
-        if (link.needs_review) needsReview++;
 
         console.log(
           `✅ ${doc.original_filename} → ${entries.length} écriture(s)`
@@ -173,15 +183,15 @@ export async function POST(
       }
     }
 
-    // 6. Calculer le solde final
+    // 6. Calculer le solde
     const balance = totalClientDebit - totalSupplierCredit;
 
-    // 7. Logs de debug
+    // 7. Logs
     console.log(`📊 Totaux calculés pour "${company.name}" :`);
     console.log(`   Documents total       : ${docLinks?.length ?? 0}`);
     console.log(`   Documents traités     : ${processed}`);
     console.log(`   Documents ignorés     : ${skipped}`);
-    console.log(`   Documents à vérifier  : ${needsReview}`);
+    console.log(`   Documents à vérifier  : ${needsReview} (NON comptés)`);
     console.log(`   Écritures créées      : ${totalEntries}`);
     console.log(`   ---`);
     console.log(`   Ventes (701)          : ${totalSales} DT`);
@@ -193,7 +203,7 @@ export async function POST(
     console.log(`   ---`);
     console.log(`   Solde (411 - 401)     : ${balance} DT`);
 
-    // 8. Mettre à jour les totaux dans la table companies
+    // 8. Update companies
     await admin
       .from('companies')
       .update({
@@ -214,6 +224,7 @@ export async function POST(
         documents_processed: processed,
         documents_skipped: skipped,
         documents_needs_review: needsReview,
+        documents_excluded: excludedFromCalc, // ⭐ NOUVEAU
         entries_created: totalEntries,
       },
       totals: {
