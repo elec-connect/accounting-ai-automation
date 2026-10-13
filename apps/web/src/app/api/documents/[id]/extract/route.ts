@@ -747,23 +747,39 @@ ${rawText.slice(0, 8000)}`,
       const dupData = await dupRes.json();
 
       if (dupData.duplicate && dupData.matches?.length > 0) {
-        const names = dupData.matches
-          .map((m: { original_filename: string }) => m.original_filename)
-          .join(', ');
+  const names = dupData.matches
+    .map((m: { original_filename: string }) => m.original_filename)
+    .join(', ');
 
-        warnings.push(`⚠️ Doublon potentiel avec : ${names}`);
+  const reasons = dupData.matches
+    .map((m: { match_reason: string }) => m.match_reason)
+    .join(' | ');
 
-        shouldCreateException = true;
-        newStatus = 'exception';
-        exceptionReason = `Doublon potentiel détecté (${dupData.matches.length} correspondance(s))`;
+  warnings.push(`⚠️ Doublon potentiel avec : ${names}`);
 
-        console.log('⚠️ Doublon détecté:', names);
+  shouldCreateException = true;
+  newStatus = 'exception';
+  exceptionReason = `Doublon potentiel détecté (${dupData.matches.length} correspondance(s))`;
 
-        await supabase
-          .from('extractions')
-          .update({ warnings })
-          .eq('document_id', id);
-      }
+  console.log('⚠️ Doublon détecté:', names);
+
+  await supabase
+    .from('extractions')
+    .update({ warnings })
+    .eq('document_id', id);
+
+  // ⭐ Marquer les liens document_companies comme doublons suspects
+  await supabase
+    .from('document_companies')
+    .update({
+      duplicate_suspect: true,
+      duplicate_reason: reasons,
+      needs_review: true, // ⭐ Force needs_review → exclu du calcul
+    })
+    .eq('document_id', id);
+
+  console.log('🚩 Liens marqués comme doublons suspects');
+}
     } catch (dupErr) {
       console.error('Duplicate check failed:', dupErr);
     }

@@ -16,6 +16,9 @@ type Document = {
   status: string;
   confidence_score: number | null;
   created_at: string;
+  // ⭐ NOUVEAU : détection doublons
+  duplicate_suspect?: boolean;
+  duplicate_reason?: string | null;
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -80,12 +83,49 @@ export function DocumentList() {
     }
 
     const supabase = createClient();
-    const { data } = await supabase
+
+    // ⭐ Charger les documents + leur statut doublon via document_companies
+    const { data: docs } = await supabase
       .from("documents")
       .select("*")
       .order("created_at", { ascending: false });
 
-    setDocuments(data || []);
+    if (!docs) {
+      setDocuments([]);
+      setLoading(false);
+      if (showSpinner) setRefreshing(false);
+      return;
+    }
+
+    // ⭐ Récupérer les flags doublon pour ces documents
+    const docIds = docs.map((d) => d.id);
+    const { data: links } = await supabase
+      .from("document_companies")
+      .select("document_id, duplicate_suspect, duplicate_reason")
+      .in("document_id", docIds);
+
+    // ⭐ Mapper les flags dans les documents
+    const linkMap = new Map<
+      string,
+      { duplicate_suspect: boolean; duplicate_reason: string | null }
+    >();
+    for (const l of links ?? []) {
+      linkMap.set(l.document_id, {
+        duplicate_suspect: l.duplicate_suspect ?? false,
+        duplicate_reason: l.duplicate_reason ?? null,
+      });
+    }
+
+    const enriched: Document[] = docs.map((d) => {
+      const l = linkMap.get(d.id);
+      return {
+        ...d,
+        duplicate_suspect: l?.duplicate_suspect ?? false,
+        duplicate_reason: l?.duplicate_reason ?? null,
+      };
+    });
+
+    setDocuments(enriched);
     setLoading(false);
 
     if (showSpinner) {
@@ -94,17 +134,17 @@ export function DocumentList() {
   }
 
   useEffect(() => {
-  loadDocuments();
+    loadDocuments();
 
-  // ⭐ Charger le mode de traitement
-  fetch("/api/settings")
-    .then((r) => r.json())
-    .then((data) => {
-      const mode = data.settings?.pipeline_mode || "auto";
-      setPipelineMode(mode);
-    })
-    .catch(() => setPipelineMode("auto"));
-}, []);
+    // ⭐ Charger le mode de traitement
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const mode = data.settings?.pipeline_mode || "auto";
+        setPipelineMode(mode);
+      })
+      .catch(() => setPipelineMode("auto"));
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -115,23 +155,23 @@ export function DocumentList() {
   }, []);
 
   useEffect(() => {
-  // ⭐ Pas d'auto-refresh en mode manuel
-  if (pipelineMode === "manual") return;
+    // ⭐ Pas d'auto-refresh en mode manuel
+    if (pipelineMode === "manual") return;
 
-  const hasRecentPending = documents.some((d) => {
-    if (d.status !== "received") return false;
-    const age = now - new Date(d.created_at).getTime();
-    return age < TWO_MINUTES_MS;
-  });
+    const hasRecentPending = documents.some((d) => {
+      if (d.status !== "received") return false;
+      const age = now - new Date(d.created_at).getTime();
+      return age < TWO_MINUTES_MS;
+    });
 
-  if (!hasRecentPending) return;
+    if (!hasRecentPending) return;
 
-  const interval = setInterval(() => {
-    loadDocuments();
-  }, 5000);
+    const interval = setInterval(() => {
+      loadDocuments();
+    }, 5000);
 
-  return () => clearInterval(interval);
-}, [documents, now, pipelineMode]);
+    return () => clearInterval(interval);
+  }, [documents, now, pipelineMode]);
 
   // ═══════════════════════════════════════════════════════════
   //  EXTRAIRE UN DOCUMENT
@@ -150,16 +190,16 @@ export function DocumentList() {
       if (res.ok) {
         const entriesCount = data.accounting?.entriesCreated ?? 0;
         const direction = data.accounting?.direction;
-        
+
         let successText = `✅ ${filename} extrait avec succès`;
-        
+
         if (entriesCount > 0) {
           successText += ` — ${entriesCount} écriture(s) comptable(s)`;
           if (direction) {
             successText += ` (${direction === "issued" ? "Vente" : "Achat"})`;
           }
         }
-        
+
         setMessage({ type: "success", text: successText });
         await loadDocuments();
       } else {
@@ -267,6 +307,9 @@ export function DocumentList() {
     return age >= FIVE_MINUTES_MS;
   }).length;
 
+  // ⭐ Nombre de doublons suspects
+  const duplicateCount = documents.filter((d) => d.duplicate_suspect).length;
+
   if (loading) return <p className="text-gray-500">Chargement…</p>;
 
   return (
@@ -290,54 +333,70 @@ export function DocumentList() {
         </div>
       )}
 
-      {/* BANDEAU : Documents récents en cours */}
-      {/* ⭐ Bandeau "En cours" — visible UNIQUEMENT en mode AUTO */}
-{pipelineMode === "auto" && recentPendingCount > 0 && (
-  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-    <span className="text-2xl">🔄</span>
-    <div className="flex-1">
-      <p className="text-sm font-semibold text-blue-900">
-        {recentPendingCount} document{recentPendingCount > 1 ? "s" : ""}{" "}
-        en cours de traitement…
-      </p>
-      <p className="text-xs text-blue-700">
-        L'IA analyse les documents. La liste se met à jour automatiquement.
-      </p>
-    </div>
-  </div>
-)}
+      {/* ⭐ BANDEAU DOUBLONS SUSPECTS */}
+      {duplicateCount > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">🚩</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-900">
+              {duplicateCount} doublon{duplicateCount > 1 ? "s" : ""} suspect
+              {duplicateCount > 1 ? "s" : ""} détecté
+              {duplicateCount > 1 ? "s" : ""}
+            </p>
+            <p className="text-xs text-red-700">
+              Ces documents sont <strong>exclus du calcul</strong> tant que vous
+              ne les acceptez ou refusez pas.
+            </p>
+          </div>
+        </div>
+      )}
 
-{/* ⭐ Bandeau "En attente" — visible en mode MANUEL */}
-{pipelineMode === "manual" && counts.received > 0 && (
-  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
-    <span className="text-2xl">👤</span>
-    <div className="flex-1">
-      <p className="text-sm font-semibold text-yellow-900">
-        {counts.received} document{counts.received > 1 ? "s" : ""} en attente d'extraction
-      </p>
-      <p className="text-xs text-yellow-700">
-        Mode manuel actif. Cliquez sur 🤖 Extraire à droite du document pour lancer l'IA.
-      </p>
-    </div>
-  </div>
-)}
+      {/* BANDEAU : Documents récents en cours */}
+      {pipelineMode === "auto" && recentPendingCount > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">🔄</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-blue-900">
+              {recentPendingCount} document{recentPendingCount > 1 ? "s" : ""}{" "}
+              en cours de traitement…
+            </p>
+            <p className="text-xs text-blue-700">
+              L'IA analyse les documents. La liste se met à jour automatiquement.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ⭐ Bandeau "En attente" — visible en mode MANUEL */}
+      {pipelineMode === "manual" && counts.received > 0 && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">👤</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-yellow-900">
+              {counts.received} document{counts.received > 1 ? "s" : ""} en attente d'extraction
+            </p>
+            <p className="text-xs text-yellow-700">
+              Mode manuel actif. Cliquez sur 🤖 Extraire à droite du document pour lancer l'IA.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* BANDEAU : Documents bloqués */}
-      {/* ⭐ Bandeau "Bloqués" — visible UNIQUEMENT en mode AUTO */}
-{pipelineMode === "auto" && stuckCount > 0 && (
-  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-    <span className="text-2xl">⚠️</span>
-    <div className="flex-1">
-      <p className="text-sm font-semibold text-red-900">
-        {stuckCount} document{stuckCount > 1 ? "s" : ""} bloqué
-        {stuckCount > 1 ? "s" : ""} en traitement
-      </p>
-      <p className="text-xs text-red-700">
-        L'extraction automatique a échoué. Cliquez sur 🤖 Extraire pour réessayer.
-      </p>
-    </div>
-  </div>
-)}
+      {pipelineMode === "auto" && stuckCount > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-900">
+              {stuckCount} document{stuckCount > 1 ? "s" : ""} bloqué
+              {stuckCount > 1 ? "s" : ""} en traitement
+            </p>
+            <p className="text-xs text-red-700">
+              L'extraction automatique a échoué. Cliquez sur 🤖 Extraire pour réessayer.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* BARRE D'ACTIONS */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -477,15 +536,44 @@ export function DocumentList() {
                 ].includes(doc.status);
                 const isExtracting = extracting === doc.id;
 
+                // ⭐ Flag doublon suspect
+                const isDuplicateSuspect = doc.duplicate_suspect === true;
+
                 return (
-                  <tr key={doc.id} className="border-b hover:bg-gray-50">
+                  <tr
+                    key={doc.id}
+                    className={`border-b transition-colors ${
+                      isDuplicateSuspect
+                        ? "bg-red-100 border-l-4 border-l-red-500 hover:bg-red-150"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
                     <td className="p-3 text-sm">
-                      <Link
-                        href={`/dashboard/documents/${doc.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {doc.original_filename || "sans nom"}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        {isDuplicateSuspect && (
+                          <span
+                            className="text-red-600 text-lg"
+                            title={doc.duplicate_reason || "Doublon suspect"}
+                          >
+                            🚩
+                          </span>
+                        )}
+                        <Link
+                          href={`/dashboard/documents/${doc.id}`}
+                          className={`hover:underline ${
+                            isDuplicateSuspect
+                              ? "text-red-700 font-semibold"
+                              : "text-blue-600"
+                          }`}
+                        >
+                          {doc.original_filename || "sans nom"}
+                        </Link>
+                      </div>
+                      {isDuplicateSuspect && doc.duplicate_reason && (
+                        <p className="text-xs text-red-600 mt-1 italic">
+                          {doc.duplicate_reason}
+                        </p>
+                      )}
                     </td>
                     <td className="p-3">
                       <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700">
@@ -508,39 +596,41 @@ export function DocumentList() {
 
                     {/* STATUT */}
                     <td className="p-3">
-                      {doc.status === "received" ? (
-  (() => {
-    const age = now - new Date(doc.created_at).getTime();
-    const isStuck = age > FIVE_MINUTES_MS;
+                      {isDuplicateSuspect ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-red-200 text-red-900 border border-red-400">
+                          🚩 Doublon suspect
+                        </span>
+                      ) : doc.status === "received" ? (
+                        (() => {
+                          const age = now - new Date(doc.created_at).getTime();
+                          const isStuck = age > FIVE_MINUTES_MS;
 
-    // ⭐ Mode MANUEL : afficher "En attente"
-    if (pipelineMode === "manual") {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
-          <span>👤</span>
-          <span>En attente</span>
-        </span>
-      );
-    }
+                          if (pipelineMode === "manual") {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                <span>👤</span>
+                                <span>En attente</span>
+                              </span>
+                            );
+                          }
 
-    // Mode AUTO : afficher "Bloqué" ou "Traitement"
-    if (isStuck) {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800">
-          <span>⚠️</span>
-          <span>Bloqué</span>
-        </span>
-      );
-    }
+                          if (isStuck) {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800">
+                                <span>⚠️</span>
+                                <span>Bloqué</span>
+                              </span>
+                            );
+                          }
 
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-        <span>🔄</span>
-        <span>Traitement…</span>
-      </span>
-    );
-  })()
-) : (
+                          return (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                              <span>🔄</span>
+                              <span>Traitement…</span>
+                            </span>
+                          );
+                        })()
+                      ) : (
                         (() => {
                           const config = STATUS_LABELS[doc.status] || {
                             label: doc.status,
@@ -564,7 +654,6 @@ export function DocumentList() {
                     {/* ⭐ ACTIONS */}
                     <td className="p-3">
                       <div className="flex items-center gap-1">
-                        {/* 🤖 Bouton Extraire (statut = received) */}
                         {canExtract && (
                           <button
                             onClick={() =>
@@ -581,7 +670,6 @@ export function DocumentList() {
                           </button>
                         )}
 
-                        {/* 🔄 Bouton Ré-extraire (déjà extrait) */}
                         {canReExtract && (
                           <button
                             onClick={() =>
@@ -598,7 +686,6 @@ export function DocumentList() {
                           </button>
                         )}
 
-                        {/* 👁️ Voir */}
                         <Link
                           href={`/dashboard/documents/${doc.id}`}
                           className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100"
@@ -607,7 +694,6 @@ export function DocumentList() {
                           👁️
                         </Link>
 
-                        {/* 🗑️ Supprimer */}
                         <button
                           onClick={() => handleDelete(doc.id)}
                           className="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50"

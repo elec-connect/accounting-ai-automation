@@ -54,6 +54,8 @@ export async function POST(
         match_score,
         confidence,
         needs_review,
+        duplicate_suspect,
+        duplicate_reason,
         documents (
           id,
           original_filename,
@@ -93,23 +95,43 @@ export async function POST(
     let needsReview = 0;
     let rejected = 0;
     let excludedFromCalc = 0;
-    let skippedByType = 0; // ⭐ NOUVEAU
+    let skippedByType = 0;
+    let duplicateSuspects = 0; // ⭐ NOUVEAU
+
+    // ⭐ Liste des documents non comptables (pour info)
+    const nonAccountableDocuments: Array<{
+      document_id: string;
+      original_filename: string;
+      type: string;
+      reason: string;
+    }> = [];
 
     // 5. Traiter chaque document
     for (const link of docLinks ?? []) {
       try {
         // ⭐ Supabase peut retourner un objet OU un tableau selon la relation
-const docArray = Array.isArray(link.documents)
-  ? link.documents
-  : link.documents
-    ? [link.documents]
-    : [];
-const docName = docArray[0]?.original_filename ?? link.document_id;
+        const docArray = Array.isArray(link.documents)
+          ? link.documents
+          : link.documents
+            ? [link.documents]
+            : [];
+        const docName = docArray[0]?.original_filename ?? link.document_id;
 
         // ⭐ IGNORER les documents refusés
         if (link.confidence === 'rejected') {
           console.log(`❌ ${docName} → REFUSÉ (non compté)`);
           rejected++;
+          excludedFromCalc++;
+          continue;
+        }
+
+        // ⭐ IGNORER les doublons suspects non résolus
+        if ((link as any).duplicate_suspect && link.needs_review) {
+          const reason = (link as any).duplicate_reason ?? 'raison inconnue';
+          console.log(
+            `🚩 ${docName} → DOUBLON SUSPECT (${reason}) — non compté`
+          );
+          duplicateSuspects++;
           excludedFromCalc++;
           continue;
         }
@@ -139,6 +161,14 @@ const docName = docArray[0]?.original_filename ?? link.document_id;
             `⏭️ ${doc.original_filename} → type "${docType}" ignoré (seules les factures sont comptabilisées)`
           );
           skippedByType++;
+
+          // ⭐ Traçabilité pour l'UI
+          nonAccountableDocuments.push({
+            document_id: doc.id,
+            original_filename: doc.original_filename || 'sans nom',
+            type: docType,
+            reason: `Type "${docType}" — non comptabilisé`,
+          });
           continue;
         }
 
@@ -149,13 +179,17 @@ const docName = docArray[0]?.original_filename ?? link.document_id;
         const fields = extraction?.extracted_fields as ExtractedFields;
 
         if (!fields) {
-          console.log(`⚠️ ${doc.original_filename} → pas d'extraction (extraction=${JSON.stringify(extraction)})`);
+          console.log(
+            `⚠️ ${doc.original_filename} → pas d'extraction (extraction=${JSON.stringify(extraction)})`
+          );
           skipped++;
           continue;
         }
 
         // Générer les écritures
-        console.log(`🔍 Tentative écritures pour ${doc.original_filename} (type=${doc.type})`);
+        console.log(
+          `🔍 Tentative écritures pour ${doc.original_filename} (type=${doc.type})`
+        );
         const entries = generateAccountingEntries(
           fields,
           'invoice',
@@ -180,7 +214,10 @@ const docName = docArray[0]?.original_filename ?? link.document_id;
           );
 
         if (insertError) {
-          console.error(`❌ Insert error for ${doc.original_filename}:`, insertError);
+          console.error(
+            `❌ Insert error for ${doc.original_filename}:`,
+            insertError
+          );
           skipped++;
           continue;
         }
@@ -221,6 +258,7 @@ const docName = docArray[0]?.original_filename ?? link.document_id;
     console.log(`   Documents ignorés     : ${skipped}`);
     console.log(`   Documents non-factures: ${skippedByType} (NON comptés)`);
     console.log(`   Documents à vérifier  : ${needsReview} (NON comptés)`);
+    console.log(`   Doublons suspects     : ${duplicateSuspects} (NON comptés)`);
     console.log(`   Écritures créées      : ${totalEntries}`);
     console.log(`   ---`);
     console.log(`   Ventes (701)          : ${totalSales} DT`);
@@ -252,12 +290,14 @@ const docName = docArray[0]?.original_filename ?? link.document_id;
         documents_total: docLinks?.length ?? 0,
         documents_processed: processed,
         documents_skipped: skipped,
-        documents_skipped_by_type: skippedByType, // ⭐ NOUVEAU
+        documents_skipped_by_type: skippedByType,
         documents_needs_review: needsReview,
         documents_rejected: rejected,
+        documents_duplicate_suspects: duplicateSuspects, // ⭐ NOUVEAU
         documents_excluded: excludedFromCalc,
         entries_created: totalEntries,
       },
+      non_accountable_documents: nonAccountableDocuments, // ⭐ NOUVEAU
       totals: {
         total_sales: Math.round(totalSales * 1000) / 1000,
         total_purchases: Math.round(totalPurchases * 1000) / 1000,
