@@ -159,6 +159,33 @@ export default function CompanyDetailPage() {
     }
   }
 
+  // ⭐ Récupérer un document refusé
+async function handleRecover(linkId: string, filename: string) {
+  if (
+    !confirm(
+      `🔄 Récupérer ${filename} ?\n\nCe document repassera en "À vérifier" et devra être accepté ou refusé à nouveau.`
+    )
+  )
+    return;
+
+  setProcessing(linkId);
+  try {
+    const res = await fetch(`/api/document-companies/${linkId}/recover`, {
+      method: "POST",
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMessage(`🔄 ${filename} récupéré`);
+      await loadData();
+      await handleRecalculate();
+    } else {
+      setMessage(`❌ ${data.error}`);
+    }
+  } finally {
+    setProcessing(null);
+  }
+}
+
   // ⭐ Accepter tout
   async function handleAcceptAll() {
     const toAccept = documents.filter(
@@ -573,37 +600,57 @@ export default function CompanyDetailPage() {
                       )}
                     </td>
                     <td className="p-2">
-                      {isPending && (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() =>
-                              handleAccept(
-                                d.id,
-                                d.documents?.original_filename ?? ""
-                              )
-                            }
-                            disabled={processing === d.id}
-                            className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                            title="Accepter"
-                          >
-                            {processing === d.id ? "⏳" : "✅"}
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleReject(
-                                d.id,
-                                d.documents?.original_filename ?? ""
-                              )
-                            }
-                            disabled={processing === d.id}
-                            className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                            title="Refuser"
-                          >
-                            {processing === d.id ? "⏳" : "❌"}
-                          </button>
-                        </div>
-                      )}
-                    </td>
+  <div className="flex gap-1">
+    {/* En attente : Accepter + Refuser */}
+    {isPending && (
+      <>
+        <button
+          onClick={() =>
+            handleAccept(
+              d.id,
+              d.documents?.original_filename ?? ""
+            )
+          }
+          disabled={processing === d.id}
+          className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          title="Accepter"
+        >
+          {processing === d.id ? "⏳" : "✅"}
+        </button>
+        <button
+          onClick={() =>
+            handleReject(
+              d.id,
+              d.documents?.original_filename ?? ""
+            )
+          }
+          disabled={processing === d.id}
+          className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+          title="Refuser"
+        >
+          {processing === d.id ? "⏳" : "❌"}
+        </button>
+      </>
+    )}
+
+    {/* Refusé : Récupérer */}
+    {isRejected && (
+      <button
+        onClick={() =>
+          handleRecover(
+            d.id,
+            d.documents?.original_filename ?? ""
+          )
+        }
+        disabled={processing === d.id}
+        className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+        title="Récupérer (remettre en attente)"
+      >
+        {processing === d.id ? "⏳" : "🔄 Récupérer"}
+      </button>
+    )}
+  </div>
+</td>
                   </tr>
                 );
               })}
