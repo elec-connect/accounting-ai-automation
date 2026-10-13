@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendExceptionEmail } from '@/lib/email/send-exception-email';
 import OpenAI from 'openai';
 import { saveAccountingEntries } from '@/lib/accounting/save-entries';
+import { matchCompanies } from '@/lib/accounting/match-companies';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -415,67 +416,96 @@ ${rawText.slice(0, 8000)}`,
     }
 
     // ─────────────────────────────────────────────────────────
-    //  8b. ⭐ GÉNÉRER LES ÉCRITURES COMPTABLES
-    //      (AVANT la décision automatique pour gérer les warnings)
+    //  8a. ⭐ MATCHING AUTOMATIQUE AVEC LES ENTREPRISES
+    //      (compare la facture avec TOUTES les entreprises connues)
     // ─────────────────────────────────────────────────────────
-    let accountingResult: {
-      success: boolean;
-      count?: number;
-      direction?: 'issued' | 'received';
-      detection?: {
-        direction: 'issued' | 'received';
-        score: number;
-        totalCriteria: number;
-        confidence: 'high' | 'medium' | 'low' | 'uncertain';
-        reasons: string[];
-      };
-      error?: string;
-      warning?: string;
-    } = { success: false };
+    let matchedCompanies: Array<{
+      company_id: string;
+      company_name: string;
+      role: 'issuer' | 'receiver';
+      direction: 'issued' | 'received';
+      score: number;
+      totalCriteria: number;
+      confidence: 'high' | 'medium' | 'low' | 'uncertain';
+      needs_review: boolean;
+      reasons: string[];
+    }> = [];
 
-    // ⚠️ On ne passe PAS detectedDirection (l'IA) :
-    // la détection est faite automatiquement via company_name/tax_id/email
     try {
-      console.log('📊 Génération des écritures comptables...');
+      console.log('🏢 Matching avec les entreprises...');
 
-      accountingResult = await saveAccountingEntries(id, extractedFields);
+      matchedCompanies = await matchCompanies(extractedFields as any);
 
-      if (accountingResult.success) {
+      if (matchedCompanies.length > 0) {
         console.log(
-          `✅ ${accountingResult.count} écriture(s) générée(s) en mode "${accountingResult.direction}"`
+          `✅ ${matchedCompanies.length} entreprise(s) détectée(s) :`
         );
+        for (const m of matchedCompanies) {
+          console.log(
+            `   ${m.role === 'issuer' ? '📤' : '📥'} ${m.company_name} → ${m.direction} (${m.score}/${m.totalCriteria} - ${m.confidence})`
+          );
+        }
 
-        if (accountingResult.warning) {
-          console.warn('⚠️', accountingResult.warning);
-          warnings.push(accountingResult.warning);
+        // Supprimer les anciens liens
+        await supabase
+          .from('document_companies')
+          .delete()
+          .eq('document_id', id);
 
-          // Ajouter aux warnings dans la DB
-          await supabase
-            .from('extractions')
-            .update({ warnings })
-            .eq('document_id', id);
+        // Créer les nouveaux liens
+        const { error: linkError } = await supabase
+          .from('document_companies')
+          .insert(
+            matchedCompanies.map((m) => ({
+              document_id: id,
+              company_id: m.company_id,
+              role: m.role,
+              direction: m.direction,
+              match_score: m.score,
+              match_details: {
+                reasons: m.reasons,
+                total_criteria: m.totalCriteria,
+              },
+              confidence: m.confidence,
+              needs_review: m.needs_review,
+            }))
+          );
+
+        if (linkError) {
+          console.error('Link companies error:', linkError);
+          warnings.push(
+            `⚠️ Erreur association entreprises : ${linkError.message}`
+          );
+        }
+
+        // ⭐ Si au moins une entreprise a une confiance faible → warning
+        const uncertainMatches = matchedCompanies.filter(
+          (m) => m.needs_review
+        );
+        if (uncertainMatches.length > 0) {
+          warnings.push(
+            `⚠️ Détection incertaine pour : ${uncertainMatches
+              .map((m) => `${m.company_name} (${m.score}/${m.totalCriteria})`)
+              .join(', ')}`
+          );
         }
       } else {
-        console.warn(
-          '⚠️ Écritures comptables non générées:',
-          accountingResult.error ?? 'raison inconnue'
-        );
-        warnings.push(
-          `⚠️ Écritures comptables non générées : ${
-            accountingResult.error ?? 'raison inconnue'
-          }`
-        );
+        console.log('⚠️ Aucune entreprise détectée pour ce document');
+        warnings.push('⚠️ Aucune entreprise détectée pour ce document');
+      }
 
+      // Mettre à jour les warnings dans la DB si modifiés
+      if (warnings.length > (parsed.warnings?.length ?? 0)) {
         await supabase
           .from('extractions')
           .update({ warnings })
           .eq('document_id', id);
       }
-    } catch (accError) {
-      console.error('Accounting entries generation failed:', accError);
+    } catch (matchErr) {
+      console.error('Matching failed:', matchErr);
       warnings.push(
-        `⚠️ Erreur génération écritures : ${
-          accError instanceof Error ? accError.message : 'inconnue'
+        `⚠️ Erreur matching entreprises : ${
+          matchErr instanceof Error ? matchErr.message : 'inconnue'
         }`
       );
 
@@ -486,20 +516,110 @@ ${rawText.slice(0, 8000)}`,
     }
 
     // ─────────────────────────────────────────────────────────
+    //  8b. ⭐ GÉNÉRER LES ÉCRITURES COMPTABLES
+    //      (pour chaque entreprise matchée avec son sens)
+    // ─────────────────────────────────────────────────────────
+    let accountingResult: {
+      success: boolean;
+      count?: number;
+      error?: string;
+      companies?: Array<{ company_id: string; entries: number }>;
+    } = { success: false };
+
+    if (matchedCompanies.length > 0) {
+      try {
+        console.log(
+          `📊 Génération des écritures pour ${matchedCompanies.length} entreprise(s)...`
+        );
+
+        let totalEntries = 0;
+        const companyEntries: Array<{
+          company_id: string;
+          entries: number;
+        }> = [];
+
+        for (const match of matchedCompanies) {
+          // ⚠️ IMPORTANT : on génère les écritures pour CHAQUE entreprise
+          // avec son sens spécifique (issued pour émetteur, received pour destinataire)
+          try {
+            const result = await saveAccountingEntries(
+              id,
+              extractedFields as any,
+              match.direction,
+              match.company_id
+            );
+
+            if (result.success) {
+              totalEntries += result.count ?? 0;
+              companyEntries.push({
+                company_id: match.company_id,
+                entries: result.count ?? 0,
+              });
+            }
+          } catch (err) {
+            console.error(
+              `Failed to generate entries for ${match.company_name}:`,
+              err
+            );
+          }
+        }
+
+        accountingResult = {
+          success: totalEntries > 0,
+          count: totalEntries,
+          companies: companyEntries,
+        };
+
+        console.log(
+          `✅ ${totalEntries} écriture(s) comptable(s) générée(s) au total`
+        );
+      } catch (accError) {
+        console.error('Accounting entries generation failed:', accError);
+        warnings.push(
+          `⚠️ Erreur génération écritures : ${
+            accError instanceof Error ? accError.message : 'inconnue'
+          }`
+        );
+
+        await supabase
+          .from('extractions')
+          .update({ warnings })
+          .eq('document_id', id);
+      }
+    } else {
+      // Fallback : génération sans company_id (comportement legacy)
+      try {
+        console.log('📊 Génération des écritures comptables (legacy)...');
+        accountingResult = await saveAccountingEntries(
+          id,
+          extractedFields as any
+        );
+
+        if (accountingResult.success) {
+          console.log(
+            `✅ ${accountingResult.count} écriture(s) générée(s)`
+          );
+        }
+      } catch (accError) {
+        console.error('Accounting entries failed:', accError);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
     //  9. Décision automatique
     // ─────────────────────────────────────────────────────────
     let shouldCreateException = confidenceScore < CONFIDENCE_THRESHOLD;
     let newStatus = shouldCreateException ? 'exception' : 'auto_approved';
     let exceptionReason = `Confiance IA faible (${confidenceScore.toFixed(0)}% < ${CONFIDENCE_THRESHOLD}%)`;
 
-    // ⭐ Si la détection comptable est incertaine → forcer une exception
-    if (
-      accountingResult.detection?.confidence === 'low' ||
-      accountingResult.detection?.confidence === 'uncertain'
-    ) {
+    // ⭐ Si une entreprise a une confiance faible → forcer une exception
+    const uncertainCompanies = matchedCompanies.filter((m) => m.needs_review);
+    if (uncertainCompanies.length > 0) {
       shouldCreateException = true;
       newStatus = 'exception';
-      exceptionReason = `${accountingResult.warning ?? 'Détection comptable incertaine'} — Sens : ${accountingResult.direction ?? 'inconnu'}`;
+      exceptionReason = `Détection incertaine pour : ${uncertainCompanies
+        .map((m) => `${m.company_name} (${m.score}/${m.totalCriteria})`)
+        .join(', ')}`;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -624,12 +744,20 @@ ${rawText.slice(0, 8000)}`,
       summary: summaryResult.summary ?? null,
       summaryGenerated: summaryResult.success,
       summaryError: summaryResult.error ?? null,
+      matchedCompanies: matchedCompanies.map((m) => ({
+        company_id: m.company_id,
+        company_name: m.company_name,
+        role: m.role,
+        direction: m.direction,
+        score: m.score,
+        totalCriteria: m.totalCriteria,
+        confidence: m.confidence,
+        needs_review: m.needs_review,
+      })),
       accounting: {
         entriesCreated: accountingResult.count ?? 0,
         success: accountingResult.success,
-        direction: accountingResult.direction ?? null,
-        detection: accountingResult.detection ?? null,
-        warning: accountingResult.warning ?? null,
+        companies: accountingResult.companies ?? [],
         error: accountingResult.error ?? null,
       },
       rawText,

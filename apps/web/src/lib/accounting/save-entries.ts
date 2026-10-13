@@ -7,7 +7,7 @@ import {
 } from './generate-entries';
 
 // ═══════════════════════════════════════════════════════════════
-//  RÉCUPÉRATION DES INFOS ENTREPRISE
+//  RÉCUPÉRATION DES INFOS ENTREPRISE (depuis settings)
 // ═══════════════════════════════════════════════════════════════
 
 async function getCompanyInfo(): Promise<{
@@ -39,12 +39,14 @@ async function getCompanyInfo(): Promise<{
 
 // ═══════════════════════════════════════════════════════════════
 //  FONCTION PRINCIPALE
+//  ⭐ Accepte maintenant un companyId (4ᵉ paramètre)
 // ═══════════════════════════════════════════════════════════════
 
 export async function saveAccountingEntries(
   documentId: string,
   fields: ExtractedFields,
-  forcedDirection?: 'issued' | 'received'
+  forcedDirection?: 'issued' | 'received',
+  companyId?: string
 ): Promise<{
   success: boolean;
   count?: number;
@@ -83,14 +85,27 @@ export async function saveAccountingEntries(
 
   const admin = createAdminClient();
 
-  // Supprimer les anciennes écritures (au cas où on régénère)
-  await admin.from('accounting_entries').delete().eq('document_id', documentId);
+  // ⭐ Si on a un companyId → on supprime UNIQUEMENT les écritures de cette entreprise pour ce document
+  // Sinon → on supprime TOUTES les écritures de ce document (mode legacy)
+  if (companyId) {
+    await admin
+      .from('accounting_entries')
+      .delete()
+      .eq('document_id', documentId)
+      .eq('company_id', companyId);
+  } else {
+    await admin
+      .from('accounting_entries')
+      .delete()
+      .eq('document_id', documentId);
+  }
 
-  // Insérer les nouvelles
+  // ⭐ Insérer les nouvelles écritures avec company_id
   const { error } = await admin.from('accounting_entries').insert(
     entries.map((e) => ({
       ...e,
       document_id: documentId,
+      company_id: companyId ?? null,  // ⭐ NOUVEAU
     }))
   );
 
@@ -99,7 +114,7 @@ export async function saveAccountingEntries(
     return { success: false, error: error.message };
   }
 
-  // ⭐ Message d'avertissement si confiance faible
+  // ⭐ Message d'avertissement si confiance faible (uniquement en mode auto-détection)
   let warning: string | undefined;
   if (detection) {
     if (detection.confidence === 'low') {
