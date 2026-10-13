@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -62,6 +62,9 @@ export default function CompanyDetailPage() {
   const [calculating, setCalculating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // ⭐ Flag anti-boucle infinie
+  const hasCalculated = useRef(false);
+
   async function loadData() {
     setLoading(true);
     const res = await fetch(`/api/companies/${id}`);
@@ -104,23 +107,32 @@ export default function CompanyDetailPage() {
     }
   }
 
+  // ⭐ UN SEUL useEffect qui gère tout (pas de boucle)
   useEffect(() => {
-    if (id) loadData();
+    if (!id) return;
+
+    // Réinitialiser le flag quand l'id change
+    hasCalculated.current = false;
+
+    async function init() {
+      // 1. Charger les données
+      await loadData();
+
+      // 2. Calculer UNE SEULE FOIS (si pas déjà fait)
+      if (!hasCalculated.current) {
+        hasCalculated.current = true;
+        await handleRecalculate();
+      }
+    }
+
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  // ⭐ Calcul automatique au chargement
-  useEffect(() => {
-    if (id && !loading && company) {
-      handleRecalculate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, loading]);
 
   if (loading) return <div className="p-8">Chargement…</div>;
   if (!company) return <div className="p-8">Entreprise introuvable</div>;
 
-  // ⭐ Fallbacks pour éviter les erreurs
+  // ⭐ Fallbacks pour éviter les erreurs toFixed
   const balanceTotal = Number(company.balance ?? 0);
   const totalSales = Number(company.total_sales ?? 0);
   const totalPurchases = Number(company.total_purchases ?? 0);
