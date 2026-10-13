@@ -71,38 +71,28 @@ export default function CompaniesPage() {
   }
 
   async function handleRematchAll() {
-    if (
-      !confirm(
-        "🔄 Re-matcher TOUS les documents avec les entreprises ?\n\n" +
-          "Cela va :\n" +
-          "• Supprimer tous les liens actuels\n" +
-          "• Re-scanner chaque document\n" +
-          "• Créer de nouveaux liens selon les scores\n\n" +
-          "Continuer ?"
-      )
-    )
-      return;
+  if (!confirm(
+    'Re-matcher TOUS les documents avec les entreprises ?\n\n' +
+    'Cela va supprimer les liens actuels et les recréer.'
+  )) return;
 
-    setRematching(true);
-    setRematchMessage(null);
+  setRematching(true);
+  setRematchMessage(null);
 
-    try {
-      const res = await fetch("/api/companies/rematch-all", {
-        method: "POST",
-      });
+  try {
+    const res = await fetch('/api/companies/rematch-all', { method: 'POST' });
+    const data = await res.json();
 
-      const data = await res.json();
-
-      if (res.ok) {
-        setRematchMessage(`✅ ${data.message}`);
-        await loadCompanies();
-      } else {
-        setRematchMessage(`❌ ${data.error}`);
-      }
-    } finally {
-      setRematching(false);
+    if (res.ok) {
+      setRematchMessage(`✅ ${data.message}`);
+      await loadCompanies();
+    } else {
+      setRematchMessage(`❌ ${data.error}`);
     }
+  } finally {
+    setRematching(false);
   }
+}
 
   if (loading) return <div className="p-8">Chargement…</div>;
 
