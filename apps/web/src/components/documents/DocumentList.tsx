@@ -65,7 +65,7 @@ export function DocumentList() {
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  // ⭐ NOUVEAUX ÉTATS
+  const [pipelineMode, setPipelineMode] = useState<string>("auto");
   const [extracting, setExtracting] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
 
@@ -94,8 +94,17 @@ export function DocumentList() {
   }
 
   useEffect(() => {
-    loadDocuments();
-  }, []);
+  loadDocuments();
+
+  // ⭐ Charger le mode de traitement
+  fetch("/api/settings")
+    .then((r) => r.json())
+    .then((data) => {
+      const mode = data.settings?.pipeline_mode || "auto";
+      setPipelineMode(mode);
+    })
+    .catch(() => setPipelineMode("auto"));
+}, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -106,20 +115,23 @@ export function DocumentList() {
   }, []);
 
   useEffect(() => {
-    const hasRecentPending = documents.some((d) => {
-      if (d.status !== "received") return false;
-      const age = now - new Date(d.created_at).getTime();
-      return age < TWO_MINUTES_MS;
-    });
+  // ⭐ Pas d'auto-refresh en mode manuel
+  if (pipelineMode === "manual") return;
 
-    if (!hasRecentPending) return;
+  const hasRecentPending = documents.some((d) => {
+    if (d.status !== "received") return false;
+    const age = now - new Date(d.created_at).getTime();
+    return age < TWO_MINUTES_MS;
+  });
 
-    const interval = setInterval(() => {
-      loadDocuments();
-    }, 5000);
+  if (!hasRecentPending) return;
 
-    return () => clearInterval(interval);
-  }, [documents, now]);
+  const interval = setInterval(() => {
+    loadDocuments();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [documents, now, pipelineMode]);
 
   // ═══════════════════════════════════════════════════════════
   //  EXTRAIRE UN DOCUMENT
@@ -279,36 +291,53 @@ export function DocumentList() {
       )}
 
       {/* BANDEAU : Documents récents en cours */}
-      {recentPendingCount > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-          <span className="text-2xl">🔄</span>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-blue-900">
-              {recentPendingCount} document{recentPendingCount > 1 ? "s" : ""}{" "}
-              en cours de traitement…
-            </p>
-            <p className="text-xs text-blue-700">
-              L'IA analyse les documents. La liste se met à jour automatiquement.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ⭐ Bandeau "En cours" — visible UNIQUEMENT en mode AUTO */}
+{pipelineMode === "auto" && recentPendingCount > 0 && (
+  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+    <span className="text-2xl">🔄</span>
+    <div className="flex-1">
+      <p className="text-sm font-semibold text-blue-900">
+        {recentPendingCount} document{recentPendingCount > 1 ? "s" : ""}{" "}
+        en cours de traitement…
+      </p>
+      <p className="text-xs text-blue-700">
+        L'IA analyse les documents. La liste se met à jour automatiquement.
+      </p>
+    </div>
+  </div>
+)}
+
+{/* ⭐ Bandeau "En attente" — visible en mode MANUEL */}
+{pipelineMode === "manual" && counts.received > 0 && (
+  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+    <span className="text-2xl">👤</span>
+    <div className="flex-1">
+      <p className="text-sm font-semibold text-yellow-900">
+        {counts.received} document{counts.received > 1 ? "s" : ""} en attente d'extraction
+      </p>
+      <p className="text-xs text-yellow-700">
+        Mode manuel actif. Cliquez sur 🤖 Extraire à droite du document pour lancer l'IA.
+      </p>
+    </div>
+  </div>
+)}
 
       {/* BANDEAU : Documents bloqués */}
-      {stuckCount > 0 && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <span className="text-2xl">⚠️</span>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-red-900">
-              {stuckCount} document{stuckCount > 1 ? "s" : ""} bloqué
-              {stuckCount > 1 ? "s" : ""} en traitement
-            </p>
-            <p className="text-xs text-red-700">
-              Cliquez sur 🤖 Extraire pour les traiter manuellement.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ⭐ Bandeau "Bloqués" — visible UNIQUEMENT en mode AUTO */}
+{pipelineMode === "auto" && stuckCount > 0 && (
+  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+    <span className="text-2xl">⚠️</span>
+    <div className="flex-1">
+      <p className="text-sm font-semibold text-red-900">
+        {stuckCount} document{stuckCount > 1 ? "s" : ""} bloqué
+        {stuckCount > 1 ? "s" : ""} en traitement
+      </p>
+      <p className="text-xs text-red-700">
+        L'extraction automatique a échoué. Cliquez sur 🤖 Extraire pour réessayer.
+      </p>
+    </div>
+  </div>
+)}
 
       {/* BARRE D'ACTIONS */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -480,27 +509,38 @@ export function DocumentList() {
                     {/* STATUT */}
                     <td className="p-3">
                       {doc.status === "received" ? (
-                        (() => {
-                          const age = now - new Date(doc.created_at).getTime();
-                          const isStuck = age > FIVE_MINUTES_MS;
+  (() => {
+    const age = now - new Date(doc.created_at).getTime();
+    const isStuck = age > FIVE_MINUTES_MS;
 
-                          if (isStuck) {
-                            return (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800">
-                                <span>⚠️</span>
-                                <span>Bloqué</span>
-                              </span>
-                            );
-                          }
+    // ⭐ Mode MANUEL : afficher "En attente"
+    if (pipelineMode === "manual") {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+          <span>👤</span>
+          <span>En attente</span>
+        </span>
+      );
+    }
 
-                          return (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                              <span>🔄</span>
-                              <span>Traitement…</span>
-                            </span>
-                          );
-                        })()
-                      ) : (
+    // Mode AUTO : afficher "Bloqué" ou "Traitement"
+    if (isStuck) {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-100 text-red-800">
+          <span>⚠️</span>
+          <span>Bloqué</span>
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+        <span>🔄</span>
+        <span>Traitement…</span>
+      </span>
+    );
+  })()
+) : (
                         (() => {
                           const config = STATUS_LABELS[doc.status] || {
                             label: doc.status,
