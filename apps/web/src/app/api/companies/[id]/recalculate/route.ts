@@ -121,6 +121,9 @@ export async function POST(
         const doc = docArray[0];
 
         if (!doc) {
+          console.log(
+            `⚠️ ${link.document_id} → doc introuvable (link.documents=${JSON.stringify(link.documents)})`
+          );
           skipped++;
           continue;
         }
@@ -142,12 +145,13 @@ export async function POST(
         const fields = extraction?.extracted_fields as ExtractedFields;
 
         if (!fields) {
-          console.log(`⚠️ ${doc.original_filename} → pas d'extraction`);
+          console.log(`⚠️ ${doc.original_filename} → pas d'extraction (extraction=${JSON.stringify(extraction)})`);
           skipped++;
           continue;
         }
 
         // Générer les écritures
+        console.log(`🔍 Tentative écritures pour ${doc.original_filename} (type=${doc.type})`);
         const entries = generateAccountingEntries(
           fields,
           'invoice',
