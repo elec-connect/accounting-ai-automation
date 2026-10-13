@@ -266,13 +266,17 @@ export default function CompanyDetailPage() {
                   <td className="p-2 text-right">
                     {Number(b.total_credit ?? 0).toFixed(3)} DT
                   </td>
-                  <td
-                    className={`p-2 text-right font-semibold ${
-                      b.balance >= 0 ? "text-green-700" : "text-red-700"
-                    }`}
-                  >
-                    {Number(b.balance ?? 0).toFixed(3)} DT
-                  </td>
+                  <td className="p-2 text-right font-semibold">
+  {b.balance >= 0 ? (
+    <span className="text-green-700">
+      {Number(b.balance).toFixed(3)} DT (Débit)
+    </span>
+  ) : (
+    <span className="text-blue-700">
+      {Math.abs(Number(b.balance)).toFixed(3)} DT (Crédit)
+    </span>
+  )}
+</td>
                 </tr>
               ))}
             </tbody>
