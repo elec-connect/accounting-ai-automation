@@ -19,9 +19,8 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-// ⭐ Feature flag
-const SUPER_ADMIN_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_SUPER_ADMIN === "true";
+// ⭐ Feature flag — FORCÉ À TRUE (temporaire)
+const SUPER_ADMIN_ENABLED = true;
 
 export function Sidebar() {
   const pathname = usePathname();
