@@ -415,7 +415,7 @@ export default function CompanyDetailPage() {
   const duplicateCount = duplicateDocs.length;
 
   return (
-    <main className="p-8 max-w-6xl">
+    <main className="p-8 max-w-[1600px] mx-auto">
       <Link
         href="/dashboard/companies"
         className="inline-block mb-4 text-sm text-blue-600 hover:underline"
