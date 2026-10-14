@@ -15,19 +15,24 @@ type Company = {
   address: string | null;
 };
 
+// ⭐ Helper : est-ce qu'une entreprise est configurée ?
+function isCompanyConfigured(c: Company): boolean {
+  return !!(c.name?.trim() && c.tax_id?.trim() && c.email?.trim());
+}
+
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
-    // ─── IA (Groq) ────────────
+    // ─── IA (Groq) — VISIBLE POUR TOUS ────────────
     groq_api_key: "",
 
-    // ─── Email (Resend) ──────
+    // ─── Email (Resend) — VISIBLE POUR TOUS ──────
     email_from: "",
     email_from_name: "",
     email_to: "",
     resend_api_key: "",
     custom_domain: "",
 
-    // ─── Super Admin ──────────────────
+    // ─── Super Admin uniquement ──────────────────
     cron_enabled: "false",
     cron_frequency: "weekly",
     cron_day: "monday",
@@ -112,54 +117,47 @@ export default function EmailSettingsPage() {
     return <div className="p-8">Chargement...</div>;
   }
 
+  // ⭐ Calcul du nombre d'entreprises configurées
+  const configuredCount = companies.filter(isCompanyConfigured).length;
+  const incompleteCount = companies.length - configuredCount;
+
   return (
     <main className="p-8 max-w-2xl">
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
 
         {/* ═══════════════════════════════════════════
-            SECTION ENTREPRISE
+            SECTION ENTREPRISE (lien vers /dashboard/companies)
             ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-  🏢 Mes entreprises
-  {companies.length > 0 && (
-    <span className="ml-2 text-sm font-normal text-gray-500">
-      ({companies.length})
-    </span>
-  )}
-</h3>
+          🏢 Mes entreprises
+          {companies.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({companies.length})
+            </span>
+          )}
+        </h3>
 
-{/* ⭐ État de configuration */}
-{companies.length > 0 && (
-  (() => {
-    const configuredCount = companies.filter(
-      (c) => c.name?.trim() && c.tax_id?.trim() && c.email?.trim()
-    ).length;
-    const incompleteCount = companies.length - configuredCount;
-
-    if (configuredCount === companies.length) {
-      return (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-          ✅ Toutes les {companies.length} entreprises sont configurées
-        </div>
-      );
-    }
-
-    return (
-      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-        ⚠️ <strong>{configuredCount}</strong> configurée
-        {configuredCount > 1 ? "s" : ""} sur <strong>{companies.length}</strong>
-        {" — "}
-        <strong>{incompleteCount}</strong> incomplète
-        {incompleteCount > 1 ? "s" : ""}
-        <br />
-        <span className="text-xs">
-          Complétez les 3 critères (nom, MF, email) pour maximiser la détection automatique.
-        </span>
-      </div>
-    );
-  })()
-)}
+        {/* ⭐ État de configuration */}
+        {companies.length > 0 && (
+          configuredCount === companies.length ? (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+              ✅ Toutes les {companies.length} entreprises sont configurées
+            </div>
+          ) : (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+              ⚠️ <strong>{configuredCount}</strong> configurée
+              {configuredCount > 1 ? "s" : ""} sur <strong>{companies.length}</strong>
+              {" — "}
+              <strong>{incompleteCount}</strong> incomplète
+              {incompleteCount > 1 ? "s" : ""}
+              <br />
+              <span className="text-xs">
+                Complétez les 3 critères (nom, MF, email) pour maximiser la détection automatique.
+              </span>
+            </div>
+          )
+        )}
 
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
           <p className="text-sm text-blue-900 font-semibold mb-2">
@@ -185,27 +183,33 @@ export default function EmailSettingsPage() {
               🏢 Gérer mes entreprises
               {companies.length > 0 ? ` (${companies.length})` : ""} →
             </Link>
-            <button
-              onClick={() => setShowConfigModal(true)}
-              className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold text-sm"
-            >
-              ⚙️ Configurer les {companies.length} entreprise
-              {companies.length > 1 ? "s" : ""}
-            </button>
+            {companies.length > 0 ? (
+              <button
+                onClick={() => setShowConfigModal(true)}
+                className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold text-sm"
+              >
+                {companies.length === 1
+                  ? "⚙️ Configurer l'entreprise"
+                  : `⚙️ Configurer les ${companies.length} entreprises`}
+              </button>
+            ) : (
+              <span className="inline-block px-4 py-2 bg-gray-200 text-gray-500 rounded font-semibold text-sm cursor-not-allowed">
+                ⚙️ Aucune entreprise à configurer
+              </span>
+            )}
           </div>
         </div>
 
         <div className="border-b mt-8 mb-8"></div>
 
-        {/* Guide de configuration */}
+        {/* Guide de configuration — VISIBLE POUR TOUS */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-blue-900">
               📘 Guide de configuration
             </p>
             <p className="text-xs text-blue-700 mt-1">
-              Consultez la documentation pour créer vos variables
-              d'environnement sur Vercel.
+              Consultez la documentation pour créer vos variables d'environnement sur Vercel.
             </p>
           </div>
           <a
@@ -218,7 +222,9 @@ export default function EmailSettingsPage() {
           </a>
         </div>
 
-        {/* SECTION VARIABLES D'ENVIRONNEMENT */}
+        {/* ═══════════════════════════════════════════
+            SECTION VARIABLES D'ENVIRONNEMENT
+            ═══════════════════════════════════════════ */}
         <h3
           id="env-status"
           className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
@@ -226,23 +232,23 @@ export default function EmailSettingsPage() {
           🔐 Variables d'environnement
         </h3>
         <p className="text-sm text-gray-500 mb-6">
-          État des variables d'environnement configurées sur Vercel. Les
-          variables critiques doivent être présentes pour que l'application
-          fonctionne.
+          État des variables d'environnement configurées sur Vercel.
+          Les variables critiques doivent être présentes pour que l'application fonctionne.
         </p>
 
         <EnvironmentStatus />
 
         <div className="border-b mt-8 mb-8"></div>
 
-        {/* SECTION IA (GROQ) */}
+        {/* ═══════════════════════════════════════════
+            SECTION IA (GROQ) — VISIBLE POUR TOUS
+            ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           🤖 Configuration IA (Groq)
         </h3>
         <p className="text-sm text-gray-500 mb-6">
-          Configurez votre clé API Groq pour activer l'assistant IA et
-          l'extraction intelligente des documents. Obtenez une clé gratuite
-          sur{" "}
+          Configurez votre clé API Groq pour activer l'assistant IA et l'extraction
+          intelligente des documents. Obtenez une clé gratuite sur{" "}
           <a
             href="https://console.groq.com/keys"
             target="_blank"
@@ -282,7 +288,9 @@ export default function EmailSettingsPage() {
           </a>
         </div>
 
-        {/* SECTION EMAIL (RESEND) */}
+        {/* ═══════════════════════════════════════════
+            SECTION EMAIL (RESEND) — VISIBLE POUR TOUS
+            ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           📧 Configuration Email (Resend)
         </h3>
@@ -300,6 +308,7 @@ export default function EmailSettingsPage() {
         </p>
 
         <div className="space-y-4">
+          {/* Champ Domaine Personnalisé */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Domaine d'envoi personnalisé
@@ -325,6 +334,7 @@ export default function EmailSettingsPage() {
             </div>
           </div>
 
+          {/* Instructions dynamiques */}
           {settings.custom_domain && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="font-bold text-blue-800 mb-2">
@@ -348,24 +358,38 @@ export default function EmailSettingsPage() {
                 </li>
                 <li>
                   Saisissez <strong>{settings.custom_domain}</strong>{" "}
-                  (recommandé : sous-domaine comme{" "}
-                  <code>notifications.{settings.custom_domain}</code>).
+                  (recommandé : utilisez un sous-domaine comme{" "}
+                  <code>notifications.{settings.custom_domain}</code> pour
+                  protéger votre réputation d'envoi).
                 </li>
                 <li>
                   Resend va générer des enregistrements <strong>DNS</strong>{" "}
-                  (TXT, MX, CNAME). Copiez-les dans votre DNS.
+                  (TXT, MX, CNAME). Copiez-les exactement dans votre
+                  fournisseur DNS (Cloudflare, OVH, etc.).
                 </li>
                 <li>
-                  Cliquez sur <strong>Verify DNS Records</strong>.
+                  Revenez sur Resend et cliquez sur{" "}
+                  <strong>Verify DNS Records</strong>. La vérification prend
+                  souvent moins de 15 minutes.
                 </li>
                 <li>
-                  Une fois <strong>Verified</strong>, copiez votre{" "}
-                  <strong>API Key</strong> et collez-la ci-dessous.
+                  Une fois le statut <strong>Verified</strong> affiché,
+                  copiez votre <strong>API Key</strong> dans{" "}
+                  <a
+                    href="https://resend.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    resend.com/api-keys
+                  </a>{" "}
+                  et collez-la ci-dessous.
                 </li>
               </ol>
             </div>
           )}
 
+          {/* Adresse email d'envoi */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Adresse email d'envoi (from)
@@ -395,6 +419,7 @@ export default function EmailSettingsPage() {
             )}
           </div>
 
+          {/* Nom de l'expéditeur */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Nom de l'expéditeur
@@ -410,6 +435,7 @@ export default function EmailSettingsPage() {
             />
           </div>
 
+          {/* Email de réception */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Email de réception (to)
@@ -425,6 +451,7 @@ export default function EmailSettingsPage() {
             />
           </div>
 
+          {/* Clé API Resend */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Clé API Resend
@@ -443,15 +470,19 @@ export default function EmailSettingsPage() {
             </p>
           </div>
 
-          {/* SECTION WEBHOOK RESEND */}
+          {/* ═══════════════════════════════════════════
+              SECTION WEBHOOK RESEND
+              ═══════════════════════════════════════════ */}
           <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
             📥 Réception d'emails (Webhook Resend)
           </h3>
           <p className="text-sm text-gray-500 mb-6">
             Configurez la réception automatique des factures par email.
+            Les documents reçus seront traités automatiquement par l'IA.
           </p>
 
           <div className="space-y-4">
+            {/* Domaine inbound */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 Domaine de réception (Inbound)
@@ -460,16 +491,17 @@ export default function EmailSettingsPage() {
                 type="text"
                 value={settings.resend_inbound_domain}
                 onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    resend_inbound_domain: e.target.value,
-                  })
+                  setSettings({ ...settings, resend_inbound_domain: e.target.value })
                 }
                 placeholder="inbound.monentreprise.com"
                 className="w-full border rounded px-3 py-2"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                L'adresse email à laquelle vos clients enverront leurs factures.
+              </p>
             </div>
 
+            {/* Secret webhook */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 Secret du Webhook (whsec_...)
@@ -478,16 +510,14 @@ export default function EmailSettingsPage() {
                 type="password"
                 value={settings.resend_webhook_secret}
                 onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    resend_webhook_secret: e.target.value,
-                  })
+                  setSettings({ ...settings, resend_webhook_secret: e.target.value })
                 }
                 placeholder="whsec_..."
                 className="w-full border rounded px-3 py-2 font-mono text-sm"
               />
             </div>
 
+            {/* URL à copier dans Resend */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 URL du Webhook (à coller dans Resend)
@@ -496,22 +526,16 @@ export default function EmailSettingsPage() {
                 <input
                   type="text"
                   readOnly
-                  value={`${
-                    process.env.NEXT_PUBLIC_APP_URL ||
-                    "https://votre-app.vercel.app"
-                  }/api/inbound-email`}
+                  value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`}
                   className="w-full border rounded px-3 py-2 bg-gray-50 font-mono text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `${
-                        process.env.NEXT_PUBLIC_APP_URL ||
-                        "https://votre-app.vercel.app"
-                      }/api/inbound-email`
+                      `${process.env.NEXT_PUBLIC_APP_URL || 'https://votre-app.vercel.app'}/api/inbound-email`
                     );
-                    alert("✅ URL copiée !");
+                    alert('✅ URL copiée !');
                   }}
                   className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 whitespace-nowrap"
                 >
@@ -520,6 +544,7 @@ export default function EmailSettingsPage() {
               </div>
             </div>
 
+            {/* Instructions */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="font-bold text-blue-800 mb-2">
                 📋 Comment configurer le webhook sur Resend
@@ -540,29 +565,32 @@ export default function EmailSettingsPage() {
                   Cliquez sur <strong>Add Webhook</strong>.
                 </li>
                 <li>
-                  Collez l'URL ci-dessus dans <strong>Endpoint URL</strong>.
+                  Collez l'URL ci-dessus dans le champ <strong>Endpoint URL</strong>.
                 </li>
                 <li>
-                  Sélectionnez <strong>email.received</strong>.
+                  Sélectionnez l'événement <strong>email.received</strong>.
                 </li>
                 <li>
-                  Copiez le <strong>Signing Secret</strong> (whsec_...).
+                  Copiez le <strong>Signing Secret</strong> (whsec_...) et collez-le
+                  dans le champ "Secret du Webhook" ci-dessus.
                 </li>
                 <li>
-                  Cliquez sur <strong>Save</strong>.
+                  Cliquez sur <strong>Save</strong>, puis sur <strong>💾 Sauvegarder</strong> ici.
                 </li>
               </ol>
             </div>
           </div>
         </div>
 
-        {/* SECTION RELANCES AUTOMATIQUES */}
+        {/* ═══════════════════════════════════════════
+            SECTION RELANCES AUTOMATIQUES
+            ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
           📧 Relances automatiques
         </h3>
         <p className="text-sm text-gray-500 mb-6">
-          Relance automatiquement les documents bloqués en exception depuis
-          plusieurs jours.
+          Relance automatiquement les documents bloqués en exception
+          depuis plusieurs jours. Utile pour ne rien oublier.
         </p>
 
         <div className="space-y-4">
@@ -606,6 +634,9 @@ export default function EmailSettingsPage() {
                     );
                   })}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
+                </p>
               </div>
 
               <div>
@@ -646,7 +677,9 @@ export default function EmailSettingsPage() {
           )}
         </div>
 
-        {/* SECTION CRON */}
+        {/* ═══════════════════════════════════════════
+            SECTION CRON
+            ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
           ⏰ Envoi automatique (Cron)
         </h3>
@@ -807,7 +840,6 @@ export default function EmailSettingsPage() {
           companies={companies}
           onClose={() => setShowConfigModal(false)}
           onSave={async () => {
-            // Recharger les entreprises
             const res = await fetch("/api/companies");
             const data = await res.json();
             setCompanies(data.companies ?? []);
@@ -915,6 +947,9 @@ function CompanyConfigModal({
     }
   }
 
+  const configuredCount = Object.values(edits).filter(isCompanyConfigured).length;
+  const incompleteCount = companies.length - configuredCount;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -922,10 +957,13 @@ function CompanyConfigModal({
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">
-              ⚙️ Configuration des entreprises
+              ⚙️ Configuration{" "}
+              {companies.length === 1
+                ? "de l'entreprise"
+                : `des ${companies.length} entreprises`}
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Modifiez les 3 paramètres du score : nom, MF, email
+              Modifiez les 3 critères du score (1/3, 2/3, 3/3)
             </p>
           </div>
           <button
@@ -957,73 +995,58 @@ function CompanyConfigModal({
               </Link>
             </div>
           ) : (
-            {companies.map((c) => {
-  const edit = edits[c.id];
-  const editIsConfigured =
-    edit.name?.trim() && edit.tax_id?.trim() && edit.email?.trim();
+            companies.map((c) => {
+              const edit = edits[c.id];
+              const editIsConfigured = isCompanyConfigured(edit);
 
-  return (
-    <div
-      key={c.id}
-      className={`border-2 rounded-lg p-4 ${
-        editIsConfigured
-          ? "border-green-300 bg-green-50"
-          : "border-yellow-300 bg-yellow-50"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="font-bold text-lg">
-            🏢 {edit.name || "Sans nom"}
-          </h3>
-          {editIsConfigured ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-200 text-green-800">
-              ✅ Configurée
-            </span>
-          ) : (
-            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
-              ⚠️ Incomplète
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => handleSaveOne(c.id)}
-          disabled={saving === c.id}
-          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:opacity-50 whitespace-nowrap"
-        >
-          {saving === c.id ? "⏳" : "💾 Sauvegarder"}
-        </button>
-      </div>
+              return (
+                <div
+                  key={c.id}
+                  className={`border-2 rounded-lg p-4 ${
+                    editIsConfigured
+                      ? "border-green-300 bg-green-50"
+                      : "border-yellow-300 bg-yellow-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-lg">
+                        🏢 {edit.name || "Sans nom"}
+                      </h3>
+                      {editIsConfigured ? (
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-200 text-green-800">
+                          ✅ Configurée
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
+                          ⚠️ Incomplète
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleSaveOne(c.id)}
+                      disabled={saving === c.id}
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {saving === c.id ? "⏳" : "💾 Sauvegarder"}
+                    </button>
+                  </div>
 
-      {/* Indicateur des critères manquants */}
-      {!editIsConfigured && (
-        <div className="mb-3 p-2 bg-white rounded border border-yellow-200 text-xs text-yellow-800">
-          <strong>Critères manquants :</strong>
-          <ul className="list-disc list-inside mt-1">
-            {!edit.name?.trim() && <li>🏷️ Nom</li>}
-            {!edit.tax_id?.trim() && <li>🆔 Matricule fiscal</li>}
-            {!edit.email?.trim() && <li>📧 Email</li>}
-          </ul>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* ... champs comme avant ... */}
-      </div>
-
-      <p className="text-xs text-gray-500 mt-3 italic">
-        💡 {editIsConfigured
-          ? "Tous les critères sont remplis → score 3/3 possible"
-          : "Complétez les 3 critères pour un score 3/3"}
-      </p>
-    </div>
-  );
-})}
+                  {!editIsConfigured && (
+                    <div className="mb-3 p-2 bg-white rounded border border-yellow-200 text-xs text-yellow-800">
+                      <strong>Critères manquants :</strong>
+                      <ul className="list-disc list-inside mt-1">
+                        {!edit.name?.trim() && <li>🏷️ Nom</li>}
+                        {!edit.tax_id?.trim() && <li>🆔 Matricule fiscal</li>}
+                        {!edit.email?.trim() && <li>📧 Email</li>}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold mb-1 text-gray-600">
-                        🏷️ Nom de l'entreprise (critère 1)
+                        🏷️ Nom (critère 1)
                       </label>
                       <input
                         type="text"
@@ -1034,11 +1057,9 @@ function CompanyConfigModal({
                             [c.id]: { ...edit, name: e.target.value },
                           })
                         }
-                        placeholder="ex: elec-connect1"
                         className="w-full border rounded px-3 py-2 text-sm bg-white"
                       />
                     </div>
-
                     <div>
                       <label className="block text-xs font-semibold mb-1 text-gray-600">
                         🆔 Matricule fiscal (critère 2)
@@ -1052,11 +1073,9 @@ function CompanyConfigModal({
                             [c.id]: { ...edit, tax_id: e.target.value },
                           })
                         }
-                        placeholder="ex: MF-123456789"
                         className="w-full border rounded px-3 py-2 text-sm font-mono bg-white"
                       />
                     </div>
-
                     <div>
                       <label className="block text-xs font-semibold mb-1 text-gray-600">
                         📧 Email (critère 3)
@@ -1070,11 +1089,9 @@ function CompanyConfigModal({
                             [c.id]: { ...edit, email: e.target.value },
                           })
                         }
-                        placeholder="ex: contact@monentreprise.com"
                         className="w-full border rounded px-3 py-2 text-sm bg-white"
                       />
                     </div>
-
                     <div>
                       <label className="block text-xs font-semibold mb-1 text-gray-600">
                         📞 Téléphone
@@ -1088,11 +1105,9 @@ function CompanyConfigModal({
                             [c.id]: { ...edit, phone: e.target.value },
                           })
                         }
-                        placeholder="ex: 29328870"
                         className="w-full border rounded px-3 py-2 text-sm bg-white"
                       />
                     </div>
-
                     <div className="md:col-span-2">
                       <label className="block text-xs font-semibold mb-1 text-gray-600">
                         📍 Adresse
@@ -1106,15 +1121,15 @@ function CompanyConfigModal({
                             [c.id]: { ...edit, address: e.target.value },
                           })
                         }
-                        placeholder="ex: 01, Rue Manfalouti Jemmel"
                         className="w-full border rounded px-3 py-2 text-sm bg-white"
                       />
                     </div>
                   </div>
 
                   <p className="text-xs text-gray-500 mt-3 italic">
-                    💡 Plus vous remplissez de critères, plus le score sera
-                    élevé (1/3, 2/3 ou 3/3)
+                    💡 {editIsConfigured
+                      ? "Tous les critères sont remplis → score 3/3 possible"
+                      : "Complétez les 3 critères pour un score 3/3"}
                   </p>
                 </div>
               );
@@ -1123,48 +1138,37 @@ function CompanyConfigModal({
         </div>
 
         {/* Footer */}
-{companies.length > 0 && (
-  (() => {
-    const configuredCount = Object.values(edits).filter(
-      (e) => e.name?.trim() && e.tax_id?.trim() && e.email?.trim()
-    ).length;
-    const incompleteCount = companies.length - configuredCount;
+        {companies.length > 0 && (
+          <div className="sticky bottom-0 bg-white border-t px-6 py-4">
+            <div className="mb-3 flex items-center gap-3 text-sm flex-wrap">
+              <span className="font-semibold">État :</span>
+              <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+                ✅ {configuredCount} configurée{configuredCount > 1 ? "s" : ""}
+              </span>
+              {incompleteCount > 0 && (
+                <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">
+                  ⚠️ {incompleteCount} incomplète{incompleteCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
 
-    return (
-      <div className="sticky bottom-0 bg-white border-t px-6 py-4">
-        {/* Résumé */}
-        <div className="mb-3 flex items-center gap-3 text-sm flex-wrap">
-          <span className="font-semibold">État :</span>
-          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-            ✅ {configuredCount} configurée{configuredCount > 1 ? "s" : ""}
-          </span>
-          {incompleteCount > 0 && (
-            <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">
-              ⚠️ {incompleteCount} incomplète{incompleteCount > 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        {/* Boutons */}
-        <div className="flex justify-between gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Fermer
-          </button>
-          <button
-            onClick={handleSaveAll}
-            disabled={saving !== null}
-            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-semibold"
-          >
-            {saving === "all" ? "⏳ Sauvegarde…" : "💾 Tout sauvegarder"}
-          </button>
-        </div>
-      </div>
-    );
-  })()
-)}
+            <div className="flex justify-between gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Fermer
+              </button>
+              <button
+                onClick={handleSaveAll}
+                disabled={saving !== null}
+                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-semibold"
+              >
+                {saving === "all" ? "⏳ Sauvegarde…" : "💾 Tout sauvegarder"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
