@@ -222,11 +222,33 @@ export function DocumentList() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Supprimer ce document ?")) return;
-    const supabase = createClient();
-    await supabase.from("documents").delete().eq("id", id);
+  if (!confirm("Supprimer ce document ?")) return;
+
+  try {
+    const res = await fetch(`/api/documents/${id}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(`❌ Erreur : ${data.error || "Suppression impossible"}`);
+      return;
+    }
+
+    // ⭐ Afficher un message de succès
+    setMessage({ type: "success", text: "✅ Document supprimé" });
+    setTimeout(() => setMessage(null), 5000);
+
     await loadDocuments();
+  } catch (err) {
+    alert(
+      `❌ Erreur réseau : ${
+        err instanceof Error ? err.message : "inconnue"
+      }`
+    );
   }
+}
 
   async function handleUpload(file: File) {
     setUploading(true);
