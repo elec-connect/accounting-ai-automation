@@ -663,174 +663,197 @@ export default function CompanyDetailPage() {
       </Card>
 
       {/* Documents */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          📄 Documents liés ({documents.length})
-        </h2>
+      {/* Documents */}
+<Card className="p-6">
+  <h2 className="text-lg font-semibold mb-4">
+    📄 Documents liés ({documents.length})
+  </h2>
 
-        {documents.length === 0 ? (
-          <p className="text-sm text-gray-500">Aucun document.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b-2">
-              <tr>
-                <th className="text-left p-2">Fichier</th>
-                <th className="text-left p-2">Rôle</th>
-                <th className="text-left p-2">Sens</th>
-                <th className="text-left p-2">Score</th>
-                <th className="text-left p-2">Statut</th>
-                <th className="text-left p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((d) => {
-                const isRejected = d.confidence === "rejected";
-                const isPending = d.needs_review && !isRejected;
-                const isDuplicateSuspect = d.duplicate_suspect === true;
+  {documents.length === 0 ? (
+    <p className="text-sm text-gray-500">Aucun document.</p>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="border-b-2">
+          <tr>
+            <th className="text-left p-3">Fichier & Détails</th>
+            <th className="text-left p-3">Rôle</th>
+            <th className="text-left p-3">Sens</th>
+            <th className="text-left p-3">Score</th>
+            <th className="text-left p-3">Statut</th>
+            <th className="text-left p-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {documents.map((d) => {
+            const isRejected = d.confidence === "rejected";
+            const isPending = d.needs_review && !isRejected;
+            const isDuplicateSuspect = d.duplicate_suspect === true;
 
-                return (
-                  <tr
-                    key={d.id}
-                    className={`border-b transition-colors ${
+            return (
+              <tr
+                key={d.id}
+                className={`border-b transition-colors ${
+                  isDuplicateSuspect
+                    ? "bg-red-100 border-l-4 border-l-red-500 hover:bg-red-200"
+                    : isRejected
+                    ? "opacity-60 hover:bg-gray-50"
+                    : "hover:bg-gray-50"
+                }`}
+              >
+                {/* Fichier + détails */}
+                <td className="p-3 align-top" style={{ minWidth: "320px" }}>
+                  <div className="flex items-start gap-2">
+                    {isDuplicateSuspect && (
+                      <span className="text-red-600 text-xl shrink-0">
+                        🚩
+                      </span>
+                    )}
+                    <div className="flex-1">
+                      {d.documents ? (
+                        <Link
+                          href={`/dashboard/documents/${d.documents.id}`}
+                          className={`hover:underline font-medium ${
+                            isDuplicateSuspect
+                              ? "text-red-700"
+                              : "text-blue-600"
+                          }`}
+                        >
+                          {d.documents.original_filename}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+
+                      {isDuplicateSuspect && d.duplicate_reason && (
+                        <ul className="mt-2 space-y-1">
+                          {formatDuplicateReason(d.duplicate_reason).map(
+                            (reason, idx) => (
+                              <li
+                                key={idx}
+                                className="text-xs text-red-700 flex items-start gap-1"
+                              >
+                                <span className="text-red-500 shrink-0">
+                                  •
+                                </span>
+                                <span>{reason}</span>
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </td>
+
+                <td className="p-3 align-top">
+                  {d.role === "issuer"
+                    ? "📤 Émetteur"
+                    : "📥 Destinataire"}
+                </td>
+
+                <td className="p-3 align-top">
+                  {d.direction === "issued" ? "Vente" : "Achat"}
+                </td>
+
+                <td className="p-3 align-top">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
                       isDuplicateSuspect
-                        ? "bg-red-100 border-l-4 border-l-red-500 hover:bg-red-200"
+                        ? "bg-red-200 text-red-900"
                         : isRejected
-                        ? "opacity-60 hover:bg-gray-50"
-                        : "hover:bg-gray-50"
+                        ? "bg-red-100 text-red-800"
+                        : d.confidence === "high"
+                        ? "bg-green-100 text-green-800"
+                        : d.confidence === "medium"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : d.confidence === "low"
+                        ? "bg-orange-100 text-orange-800"
+                        : "bg-gray-100 text-gray-800"
                     }`}
                   >
-                    <td className="p-2">
-                      <div className="flex items-center gap-2">
-                        {isDuplicateSuspect && (
-                          <span
-                            className="text-red-600 text-lg"
-                            title={d.duplicate_reason || "Doublon suspect"}
-                          >
-                            🚩
-                          </span>
-                        )}
-                        {d.documents ? (
-                          <Link
-                            href={`/dashboard/documents/${d.documents.id}`}
-                            className={`hover:underline ${
-                              isDuplicateSuspect
-                                ? "text-red-700 font-semibold"
-                                : "text-blue-600"
-                            }`}
-                          >
-                            {d.documents.original_filename}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </div>
-                      {isDuplicateSuspect && d.duplicate_reason && (
-                        <p className="text-xs text-red-600 mt-1 italic">
-                          {d.duplicate_reason}
-                        </p>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      {d.role === "issuer" ? "📤 Émetteur" : "📥 Destinataire"}
-                    </td>
-                    <td className="p-2">
-                      {d.direction === "issued" ? "Vente" : "Achat"}
-                    </td>
-                    <td className="p-2">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                          isDuplicateSuspect
-                            ? "bg-red-200 text-red-900"
-                            : isRejected
-                            ? "bg-red-100 text-red-800"
-                            : d.confidence === "high"
-                            ? "bg-green-100 text-green-800"
-                            : d.confidence === "medium"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : d.confidence === "low"
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {isRejected ? "❌" : `${d.match_score ?? 0}/3`}
-                      </span>
-                    </td>
-                    <td className="p-2">
-                      {isDuplicateSuspect ? (
-                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-200 text-red-900 border border-red-400">
-                          🚩 Doublon suspect
-                        </span>
-                      ) : isRejected ? (
-                        <span className="text-xs text-red-700 font-semibold">
-                          ❌ Refusé
-                        </span>
-                      ) : isPending ? (
-                        <span className="text-xs text-orange-700 font-semibold">
-                          ⚠️ À vérifier
-                        </span>
-                      ) : (
-                        <span className="text-xs text-green-700">✅ OK</span>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      <div className="flex gap-1">
-                        {/* En attente ou Doublon suspect : Accepter + Refuser */}
-                        {(isPending || isDuplicateSuspect) && !isRejected && (
-                          <>
-                            <button
-                              onClick={() =>
-                                handleAccept(
-                                  d.id,
-                                  d.documents?.original_filename ?? ""
-                                )
-                              }
-                              disabled={processing === d.id}
-                              className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                              title="Accepter"
-                            >
-                              {processing === d.id ? "⏳" : "✅"}
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleReject(
-                                  d.id,
-                                  d.documents?.original_filename ?? ""
-                                )
-                              }
-                              disabled={processing === d.id}
-                              className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                              title="Refuser"
-                            >
-                              {processing === d.id ? "⏳" : "❌"}
-                            </button>
-                          </>
-                        )}
+                    {isRejected ? "❌" : `${d.match_score ?? 0}/3`}
+                  </span>
+                </td>
 
-                        {/* Refusé : Récupérer */}
-                        {isRejected && (
-                          <button
-                            onClick={() =>
-                              handleRecover(
-                                d.id,
-                                d.documents?.original_filename ?? ""
-                              )
-                            }
-                            disabled={processing === d.id}
-                            className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
-                            title="Récupérer (remettre en attente)"
-                          >
-                            {processing === d.id ? "⏳" : "🔄 Récupérer"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </Card>
+                <td className="p-3 align-top" style={{ minWidth: "160px" }}>
+                  {isDuplicateSuspect ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-red-200 text-red-900 border-2 border-red-400 whitespace-nowrap">
+                      🚩 Doublon suspect
+                    </span>
+                  ) : isRejected ? (
+                    <span className="text-xs text-red-700 font-semibold">
+                      ❌ Refusé
+                    </span>
+                  ) : isPending ? (
+                    <span className="text-xs text-orange-700 font-semibold">
+                      ⚠️ À vérifier
+                    </span>
+                  ) : (
+                    <span className="text-xs text-green-700">
+                      ✅ OK
+                    </span>
+                  )}
+                </td>
+
+                <td className="p-3 align-top">
+                  <div className="flex gap-1">
+                    {(isPending || isDuplicateSuspect) && !isRejected && (
+                      <>
+                        <button
+                          onClick={() =>
+                            handleAccept(
+                              d.id,
+                              d.documents?.original_filename ?? ""
+                            )
+                          }
+                          disabled={processing === d.id}
+                          className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          title="Accepter"
+                        >
+                          {processing === d.id ? "⏳" : "✅"}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleReject(
+                              d.id,
+                              d.documents?.original_filename ?? ""
+                            )
+                          }
+                          disabled={processing === d.id}
+                          className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                          title="Refuser"
+                        >
+                          {processing === d.id ? "⏳" : "❌"}
+                        </button>
+                      </>
+                    )}
+
+                    {isRejected && (
+                      <button
+                        onClick={() =>
+                          handleRecover(
+                            d.id,
+                            d.documents?.original_filename ?? ""
+                          )
+                        }
+                        disabled={processing === d.id}
+                        className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+                        title="Récupérer"
+                      >
+                        {processing === d.id ? "⏳" : "🔄 Récupérer"}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Card>
     </main>
   );
 }
