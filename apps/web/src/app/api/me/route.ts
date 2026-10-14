@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -16,15 +17,18 @@ export async function GET() {
       });
     }
 
-    // Récupérer le profil (role + full_name)
-    const { data: profile } = await supabase
+    // ⭐ Utiliser le client ADMIN pour bypasser RLS
+    const admin = createAdminClient();
+
+    // Récupérer le profil
+    const { data: profile } = await admin
       .from("profiles")
       .select("role, full_name")
       .eq("id", user.id)
       .maybeSingle();
 
-    // Vérifier si super-admin
-    const { data: superAdmin } = await supabase
+    // Vérifier super_admin
+    const { data: superAdmin } = await admin
       .from("super_admins")
       .select("email")
       .eq("email", user.email)
@@ -32,7 +36,7 @@ export async function GET() {
 
     return NextResponse.json({
       profile: profile ?? null,
-      email: user.email,        // ⭐ ajouté
+      email: user.email,
       is_super_admin: !!superAdmin,
     });
   } catch (error) {
