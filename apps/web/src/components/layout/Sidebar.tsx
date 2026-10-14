@@ -20,8 +20,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 // ⭐ Feature flag
-const SUPER_ADMIN_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_SUPER_ADMIN === "true";
+const SUPER_ADMIN_ENABLED = true;
 
 export function Sidebar() {
   const pathname = usePathname();

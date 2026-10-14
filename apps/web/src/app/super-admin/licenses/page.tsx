@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SuperAdminGuard } from "@/components/super-admin/SuperAdminGuard";
 
 // ═══════════════════════════════════════════════════════════════
 //  TYPES
@@ -34,22 +33,10 @@ const DURATIONS = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
-//  COMPOSANT PRINCIPAL (avec guard)
+//  COMPOSANT PRINCIPAL
 // ═══════════════════════════════════════════════════════════════
 
 export default function SuperAdminLicensesPage() {
-  return (
-    <SuperAdminGuard>
-      <SuperAdminLicensesContent />
-    </SuperAdminGuard>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  CONTENU (protégé par le guard)
-// ═══════════════════════════════════════════════════════════════
-
-function SuperAdminLicensesContent() {
   const [licenses, setLicenses] = useState<License[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
