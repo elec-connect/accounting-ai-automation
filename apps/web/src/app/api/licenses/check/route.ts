@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,24 @@ export async function GET() {
       return NextResponse.json({ valid: false, reason: 'unauthenticated' });
     }
 
+    // ⭐ Vérifier si super_admin → bypass licence
+    const admin = createAdminClient();
+    const { data: superAdmin } = await admin
+      .from('super_admins')
+      .select('email')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    if (superAdmin) {
+      return NextResponse.json({
+        valid: true,
+        reason: 'super_admin',
+        license: null,
+        daysLeft: null,
+      });
+    }
+
+    // Sinon, vérifier la licence normale
     const { data: license } = await supabase
       .from('licenses')
       .select('*')
