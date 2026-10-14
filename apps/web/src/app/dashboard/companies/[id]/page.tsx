@@ -52,6 +52,22 @@ type DocLink = {
   } | null;
 };
 
+// ⭐ Dédupliquer les raisons de doublon
+function formatDuplicateReason(reason: string | null | undefined): string[] {
+  if (!reason) return [];
+
+  // Séparer par " | " et retirer les doublons
+  const parts = reason
+    .split(' | ')
+    .map((r) => r.trim())
+    .filter((r) => r.length > 0);
+
+  // Dédupliquer
+  const unique = Array.from(new Set(parts));
+
+  return unique;
+}
+
 export default function CompanyDetailPage() {
   const params = useParams();
   const id = params?.id as string;
