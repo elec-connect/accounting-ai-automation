@@ -121,13 +121,45 @@ export default function EmailSettingsPage() {
             SECTION ENTREPRISE
             ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
-          🏢 Mes entreprises
-          {companies.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({companies.length})
-            </span>
-          )}
-        </h3>
+  🏢 Mes entreprises
+  {companies.length > 0 && (
+    <span className="ml-2 text-sm font-normal text-gray-500">
+      ({companies.length})
+    </span>
+  )}
+</h3>
+
+{/* ⭐ État de configuration */}
+{companies.length > 0 && (
+  (() => {
+    const configuredCount = companies.filter(
+      (c) => c.name?.trim() && c.tax_id?.trim() && c.email?.trim()
+    ).length;
+    const incompleteCount = companies.length - configuredCount;
+
+    if (configuredCount === companies.length) {
+      return (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+          ✅ Toutes les {companies.length} entreprises sont configurées
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+        ⚠️ <strong>{configuredCount}</strong> configurée
+        {configuredCount > 1 ? "s" : ""} sur <strong>{companies.length}</strong>
+        {" — "}
+        <strong>{incompleteCount}</strong> incomplète
+        {incompleteCount > 1 ? "s" : ""}
+        <br />
+        <span className="text-xs">
+          Complétez les 3 critères (nom, MF, email) pour maximiser la détection automatique.
+        </span>
+      </div>
+    );
+  })()
+)}
 
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
           <p className="text-sm text-blue-900 font-semibold mb-2">
@@ -925,25 +957,68 @@ function CompanyConfigModal({
               </Link>
             </div>
           ) : (
-            companies.map((c) => {
-              const edit = edits[c.id];
-              return (
-                <div
-                  key={c.id}
-                  className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-lg">
-                      🏢 {c.name || "Sans nom"}
-                    </h3>
-                    <button
-                      onClick={() => handleSaveOne(c.id)}
-                      disabled={saving === c.id}
-                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:opacity-50"
-                    >
-                      {saving === c.id ? "⏳" : "💾 Sauvegarder"}
-                    </button>
-                  </div>
+            {companies.map((c) => {
+  const edit = edits[c.id];
+  const editIsConfigured =
+    edit.name?.trim() && edit.tax_id?.trim() && edit.email?.trim();
+
+  return (
+    <div
+      key={c.id}
+      className={`border-2 rounded-lg p-4 ${
+        editIsConfigured
+          ? "border-green-300 bg-green-50"
+          : "border-yellow-300 bg-yellow-50"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-lg">
+            🏢 {edit.name || "Sans nom"}
+          </h3>
+          {editIsConfigured ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-200 text-green-800">
+              ✅ Configurée
+            </span>
+          ) : (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
+              ⚠️ Incomplète
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => handleSaveOne(c.id)}
+          disabled={saving === c.id}
+          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:opacity-50 whitespace-nowrap"
+        >
+          {saving === c.id ? "⏳" : "💾 Sauvegarder"}
+        </button>
+      </div>
+
+      {/* Indicateur des critères manquants */}
+      {!editIsConfigured && (
+        <div className="mb-3 p-2 bg-white rounded border border-yellow-200 text-xs text-yellow-800">
+          <strong>Critères manquants :</strong>
+          <ul className="list-disc list-inside mt-1">
+            {!edit.name?.trim() && <li>🏷️ Nom</li>}
+            {!edit.tax_id?.trim() && <li>🆔 Matricule fiscal</li>}
+            {!edit.email?.trim() && <li>📧 Email</li>}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* ... champs comme avant ... */}
+      </div>
+
+      <p className="text-xs text-gray-500 mt-3 italic">
+        💡 {editIsConfigured
+          ? "Tous les critères sont remplis → score 3/3 possible"
+          : "Complétez les 3 critères pour un score 3/3"}
+      </p>
+    </div>
+  );
+})}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
@@ -1048,23 +1123,48 @@ function CompanyConfigModal({
         </div>
 
         {/* Footer */}
-        {companies.length > 0 && (
-          <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-between gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Fermer
-            </button>
-            <button
-              onClick={handleSaveAll}
-              disabled={saving !== null}
-              className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-semibold"
-            >
-              {saving === "all" ? "⏳ Sauvegarde…" : "💾 Tout sauvegarder"}
-            </button>
-          </div>
-        )}
+{companies.length > 0 && (
+  (() => {
+    const configuredCount = Object.values(edits).filter(
+      (e) => e.name?.trim() && e.tax_id?.trim() && e.email?.trim()
+    ).length;
+    const incompleteCount = companies.length - configuredCount;
+
+    return (
+      <div className="sticky bottom-0 bg-white border-t px-6 py-4">
+        {/* Résumé */}
+        <div className="mb-3 flex items-center gap-3 text-sm flex-wrap">
+          <span className="font-semibold">État :</span>
+          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+            ✅ {configuredCount} configurée{configuredCount > 1 ? "s" : ""}
+          </span>
+          {incompleteCount > 0 && (
+            <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">
+              ⚠️ {incompleteCount} incomplète{incompleteCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Boutons */}
+        <div className="flex justify-between gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Fermer
+          </button>
+          <button
+            onClick={handleSaveAll}
+            disabled={saving !== null}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-semibold"
+          >
+            {saving === "all" ? "⏳ Sauvegarde…" : "💾 Tout sauvegarder"}
+          </button>
+        </div>
+      </div>
+    );
+  })()
+)}
       </div>
     </div>
   );
