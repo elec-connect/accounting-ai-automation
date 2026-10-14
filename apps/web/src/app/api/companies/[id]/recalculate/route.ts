@@ -15,11 +15,24 @@ export async function POST(
 ) {
   try {
     const { id: companyId } = await params;
-
-    // ⭐ Nettoyer l'ID
     const cleanCompanyId = String(companyId).trim();
 
-    console.log(`🔍 Recalcul pour company_id = "${cleanCompanyId}"`);
+    // ⭐ NOUVEAU : lire les dates depuis le body
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    try {
+      const body = await request.json();
+      dateFrom = body.date_from ?? null;
+      dateTo = body.date_to ?? null;
+    } catch {
+      // Pas de body → pas de filtre date
+    }
+
+    console.log(
+      `🔍 Recalcul pour company_id = "${cleanCompanyId}"` +
+        (dateFrom ? ` du ${dateFrom}` : "") +
+        (dateTo ? ` au ${dateTo}` : "")
+    );
 
     // 1. Auth
     const supabase = await createClient();
@@ -178,29 +191,48 @@ export async function POST(
 
         const fields = extraction?.extracted_fields as ExtractedFields;
 
-        if (!fields) {
-          console.log(
-            `⚠️ ${doc.original_filename} → pas d'extraction (extraction=${JSON.stringify(extraction)})`
-          );
-          skipped++;
-          continue;
-        }
+if (!fields) {
+  console.log(`⚠️ ${doc.original_filename} → pas d'extraction (extraction=${JSON.stringify(extraction)})`);
+  skipped++;
+  continue;
+}
 
-        // Générer les écritures
-        console.log(
-          `🔍 Tentative écritures pour ${doc.original_filename} (type=${doc.type})`
-        );
-        const entries = generateAccountingEntries(
-          fields,
-          'invoice',
-          link.direction as 'issued' | 'received'
-        );
+// ⭐⭐⭐ NOUVEAU : FILTRE DATE (avant la génération des écritures)
+const invoiceDate = String(fields.invoice_date || '').trim();
+if (invoiceDate && (dateFrom || dateTo)) {
+  // Extraire la date au format YYYY-MM-DD (enlève l'heure si présente)
+  const dateOnly = invoiceDate.split(' ')[0];
 
-        if (entries.length === 0) {
-          console.log(`⚠️ ${doc.original_filename} → 0 écriture (pas de montant)`);
-          skipped++;
-          continue;
-        }
+  if (dateFrom && dateOnly < dateFrom) {
+    console.log(
+      `⏭️ ${doc.original_filename} → date ${dateOnly} < ${dateFrom} (hors période)`
+    );
+    skipped++;
+    continue;
+  }
+
+  if (dateTo && dateOnly > dateTo) {
+    console.log(
+      `⏭️ ${doc.original_filename} → date ${dateOnly} > ${dateTo} (hors période)`
+    );
+    skipped++;
+    continue;
+  }
+}
+
+// Générer les écritures
+console.log(`🔍 Tentative écritures pour ${doc.original_filename} (type=${doc.type})`);
+const entries = generateAccountingEntries(
+  fields,
+  'invoice',
+  link.direction as 'issued' | 'received'
+);
+
+if (entries.length === 0) {
+  console.log(`⚠️ ${doc.original_filename} → 0 écriture (pas de montant)`);
+  skipped++;
+  continue;
+}
 
         // Insérer les écritures
         const { error: insertError } = await admin
@@ -297,6 +329,7 @@ export async function POST(
         documents_excluded: excludedFromCalc,
         entries_created: totalEntries,
       },
+      
       non_accountable_documents: nonAccountableDocuments, // ⭐ NOUVEAU
       totals: {
         total_sales: Math.round(totalSales * 1000) / 1000,

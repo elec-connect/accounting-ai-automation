@@ -9,6 +9,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+
+    // ⭐ NOUVEAU : lire les dates depuis les query params
+    const dateFrom = searchParams.get('date_from');
+    const dateTo = searchParams.get('date_to');
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -29,13 +35,24 @@ export async function GET(
       );
     }
 
-    const { data: entries } = await supabase
+    // ⭐⭐⭐ Filtrer les écritures par date
+    let entriesQuery = supabase
       .from('accounting_entries')
       .select('*')
-      .eq('company_id', id)
-      .order('entry_date', { ascending: false });
+      .eq('company_id', id);
 
-    // ⭐⭐⭐ AJOUT : duplicate_suspect et duplicate_reason
+    if (dateFrom) {
+      entriesQuery = entriesQuery.gte('entry_date', dateFrom);
+    }
+    if (dateTo) {
+      entriesQuery = entriesQuery.lte('entry_date', dateTo);
+    }
+
+    const { data: entries } = await entriesQuery.order('entry_date', {
+      ascending: false,
+    });
+
+    // Documents liés (avec duplicate_suspect / duplicate_reason)
     const { data: documents } = await supabase
       .from('document_companies')
       .select(`
@@ -128,6 +145,11 @@ export async function GET(
       documents: documents ?? [],
       balance,
       parties,
+      // ⭐ NOUVEAU : retourner les dates utilisées
+      date_filter: {
+        from: dateFrom,
+        to: dateTo,
+      },
     });
   } catch (error) {
     return NextResponse.json(

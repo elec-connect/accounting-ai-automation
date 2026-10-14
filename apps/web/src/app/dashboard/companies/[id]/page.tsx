@@ -83,28 +83,45 @@ export default function CompanyDetailPage() {
   const [acceptingAll, setAcceptingAll] = useState(false);
   const [rejectingAll, setRejectingAll] = useState(false);
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
 
   const hasCalculated = useRef(false);
 
   async function loadData() {
-    setLoading(true);
-    const res = await fetch(`/api/companies/${id}`);
-    const data = await res.json();
-    setCompany(data.company);
-    setBalance(data.balance ?? []);
-    setParties(data.parties ?? []);
-    setDocuments(data.documents ?? []);
-    setLoading(false);
-  }
+  setLoading(true);
+
+  // ⭐ Ajouter les dates en query params
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+
+  const url = `/api/companies/${id}${
+    params.toString() ? `?${params.toString()}` : ''
+  }`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+  setCompany(data.company);
+  setBalance(data.balance ?? []);
+  setParties(data.parties ?? []);
+  setDocuments(data.documents ?? []);
+  setLoading(false);
+}
 
   async function handleRecalculate() {
-    setCalculating(true);
-    setMessage(null);
+  setCalculating(true);
+  setMessage(null);
 
-    try {
-      const res = await fetch(`/api/companies/${id}/recalculate`, {
-        method: "POST",
-      });
+  try {
+    const res = await fetch(`/api/companies/${id}/recalculate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date_from: dateFrom || null,
+        date_to: dateTo || null,
+      }),
+    });
 
       const data = await res.json();
 
@@ -466,6 +483,73 @@ export default function CompanyDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* ⭐ FILTRE PAR DATE */}
+<Card className="p-4 mb-6 bg-blue-50 border-blue-200">
+  <div className="flex items-end gap-4 flex-wrap">
+    <div className="flex items-center gap-2">
+      <span className="text-2xl">📅</span>
+      <span className="font-semibold text-blue-900">Période :</span>
+    </div>
+
+    <div className="flex flex-col">
+      <label className="text-xs text-blue-700 font-medium mb-1">
+        Date de début
+      </label>
+      <input
+        type="date"
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        className="px-3 py-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+
+    <div className="flex flex-col">
+      <label className="text-xs text-blue-700 font-medium mb-1">
+        Date de fin
+      </label>
+      <input
+        type="date"
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        className="px-3 py-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+
+    <button
+      onClick={async () => {
+        await loadData();
+        await handleRecalculate();
+      }}
+      disabled={calculating}
+      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+    >
+      {calculating ? "⏳ Calcul…" : "📊 Appliquer"}
+    </button>
+
+    {(dateFrom || dateTo) && (
+      <button
+        onClick={async () => {
+          setDateFrom("");
+          setDateTo("");
+          await loadData();
+          await handleRecalculate();
+        }}
+        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap"
+      >
+        ✖ Effacer
+      </button>
+    )}
+
+    {(dateFrom || dateTo) && (
+      <div className="text-sm text-blue-800 ml-auto">
+        {dateFrom && <span>Du <strong>{dateFrom}</strong></span>}
+        {dateFrom && dateTo && <span> </span>}
+        {dateTo && <span>Au <strong>{dateTo}</strong></span>}
+      </div>
+    )}
+  </div>
+</Card>
 
       {message && (
         <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
