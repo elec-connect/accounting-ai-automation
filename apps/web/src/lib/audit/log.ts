@@ -41,7 +41,7 @@ export async function logAudit(params: {
       userAgent = params.request.headers.get('user-agent') || undefined;
     }
 
-    await admin.from('audit_log').insert({
+    const { error } = await admin.from('audit_logs').insert({  // ⭐ pluriel
       user_id: params.userId ?? null,
       user_email: params.userEmail ?? null,
       action: params.action,
@@ -51,6 +51,10 @@ export async function logAudit(params: {
       ip_address: ipAddress,
       user_agent: userAgent,
     });
+
+    if (error) {
+      console.error('Audit log insert error:', error);
+    }
   } catch (error) {
     console.error('Audit log failed:', error);
     // Ne pas faire planter l'app si le log échoue
