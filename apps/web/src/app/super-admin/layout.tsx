@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export default async function SuperAdminLayout({
   children,
@@ -13,7 +14,10 @@ export default async function SuperAdminLayout({
     redirect('/login');
   }
 
-  const { data: superAdmin } = await supabase
+  // ⭐ Utilise le client ADMIN (bypass RLS)
+  const admin = createAdminClient();
+
+  const { data: superAdmin } = await admin
     .from('super_admins')
     .select('email')
     .eq('email', user.email)

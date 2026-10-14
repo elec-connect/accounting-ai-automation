@@ -11,16 +11,6 @@ export function SuperAdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // ⭐ Vérification 1 : variable d'environnement
-    const isSuperAdminEnabled =
-      process.env.NEXT_PUBLIC_ENABLE_SUPER_ADMIN === "true";
-
-    if (!isSuperAdminEnabled) {
-      setState("forbidden");
-      return;
-    }
-
-    // ⭐ Vérification 2 : session utilisateur
     const supabase = createClient();
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -29,17 +19,14 @@ export function SuperAdminGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // ⭐ Vérification 3 : rôle super_admin
+      // ⭐ Vérification : rôle super_admin dans profiles
       const { data: profile } = await supabase
         .from("profiles")
         .select("role, is_active")
         .eq("id", user.id)
         .single();
 
-      if (
-        !profile?.is_active ||
-        profile.role !== "super_admin"
-      ) {
+      if (!profile?.is_active || profile.role !== "super_admin") {
         setState("forbidden");
         return;
       }
