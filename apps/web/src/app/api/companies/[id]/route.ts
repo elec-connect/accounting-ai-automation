@@ -3,6 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
+// ═══════════════════════════════════════════════════════════════
+//  GET — Récupérer une entreprise + ses données comptables
+// ═══════════════════════════════════════════════════════════════
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -11,7 +15,7 @@ export async function GET(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
 
-    // ⭐ NOUVEAU : lire les dates depuis les query params
+    // ⭐ Lire les dates depuis les query params
     const dateFrom = searchParams.get('date_from');
     const dateTo = searchParams.get('date_to');
 
@@ -35,7 +39,7 @@ export async function GET(
       );
     }
 
-    // ⭐⭐⭐ Filtrer les écritures par date
+    // ⭐ Filtrer les écritures par date
     let entriesQuery = supabase
       .from('accounting_entries')
       .select('*')
@@ -145,13 +149,90 @@ export async function GET(
       documents: documents ?? [],
       balance,
       parties,
-      // ⭐ NOUVEAU : retourner les dates utilisées
       date_filter: {
         from: dateFrom,
         to: dateTo,
       },
     });
   } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PATCH — Modifier une entreprise (nom, MF, email, etc.)
+// ═══════════════════════════════════════════════════════════════
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    // 1. Auth
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Vérifier que l'entreprise existe
+    const { data: existing } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Entreprise introuvable' },
+        { status: 404 }
+      );
+    }
+
+    // 3. Lire le body
+    const body = await request.json();
+    const { name, tax_id, email, phone, address } = body;
+
+    if (!name?.trim()) {
+      return NextResponse.json(
+        { error: 'Le nom de l\'entreprise est requis' },
+        { status: 400 }
+      );
+    }
+
+    // 4. Mettre à jour
+    const { data: company, error } = await supabase
+      .from('companies')
+      .update({
+        name: name.trim(),
+        tax_id: tax_id?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        address: address?.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update company error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    console.log(`✅ Entreprise mise à jour : ${company.name} (${id})`);
+
+    return NextResponse.json({
+      success: true,
+      company,
+    });
+  } catch (error) {
+    console.error('PATCH company error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

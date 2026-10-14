@@ -5,19 +5,29 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { EnvironmentStatus } from "@/components/settings/EnvironmentStatus";
 
+// ⭐ Type Company
+type Company = {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+};
+
 export default function EmailSettingsPage() {
   const [settings, setSettings] = useState({
-    // ─── IA (Groq) — VISIBLE POUR TOUS ────────────
+    // ─── IA (Groq) ────────────
     groq_api_key: "",
 
-    // ─── Email (Resend) — VISIBLE POUR TOUS ──────
+    // ─── Email (Resend) ──────
     email_from: "",
     email_from_name: "",
     email_to: "",
     resend_api_key: "",
     custom_domain: "",
 
-    // ─── Super Admin uniquement ──────────────────
+    // ─── Super Admin ──────────────────
     cron_enabled: "false",
     cron_frequency: "weekly",
     cron_day: "monday",
@@ -35,7 +45,10 @@ export default function EmailSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
-  const [companiesCount, setCompaniesCount] = useState<number>(0);
+
+  // ⭐ Companies
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -45,11 +58,11 @@ export default function EmailSettingsPage() {
         setLoading(false);
       });
 
-    // ⭐ Charger le nombre d'entreprises
+    // ⭐ Charger les entreprises
     fetch("/api/companies")
       .then((r) => r.json())
-      .then((data) => setCompaniesCount(data.companies?.length ?? 0))
-      .catch(() => setCompaniesCount(0));
+      .then((data) => setCompanies(data.companies ?? []))
+      .catch(() => setCompanies([]));
   }, []);
 
   async function handleSave() {
@@ -105,13 +118,13 @@ export default function EmailSettingsPage() {
         <h2 className="text-xl font-bold mb-6">⚙️ Paramètres généraux</h2>
 
         {/* ═══════════════════════════════════════════
-            SECTION ENTREPRISE (lien vers /dashboard/companies)
+            SECTION ENTREPRISE
             ═══════════════════════════════════════════ */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           🏢 Mes entreprises
-          {companiesCount > 0 && (
+          {companies.length > 0 && (
             <span className="ml-2 text-sm font-normal text-gray-500">
-              ({companiesCount})
+              ({companies.length})
             </span>
           )}
         </h3>
@@ -132,18 +145,27 @@ export default function EmailSettingsPage() {
             <li>Chaque facture est rattachée automatiquement à la bonne entreprise</li>
             <li>La comptabilité est calculée par entreprise</li>
           </ul>
-          <Link
-            href="/dashboard/companies"
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm"
-          >
-            🏢 Gérer mes entreprises
-            {companiesCount > 0 ? ` (${companiesCount})` : ""} →
-          </Link>
+          <div className="flex gap-2 flex-wrap">
+            <Link
+              href="/dashboard/companies"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm"
+            >
+              🏢 Gérer mes entreprises
+              {companies.length > 0 ? ` (${companies.length})` : ""} →
+            </Link>
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold text-sm"
+            >
+              ⚙️ Configurer les {companies.length} entreprise
+              {companies.length > 1 ? "s" : ""}
+            </button>
+          </div>
         </div>
 
         <div className="border-b mt-8 mb-8"></div>
 
-        {/* Guide de configuration — VISIBLE POUR TOUS */}
+        {/* Guide de configuration */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-blue-900">
@@ -164,9 +186,7 @@ export default function EmailSettingsPage() {
           </a>
         </div>
 
-        {/* ═══════════════════════════════════════════
-            SECTION VARIABLES D'ENVIRONNEMENT
-            ═══════════════════════════════════════════ */}
+        {/* SECTION VARIABLES D'ENVIRONNEMENT */}
         <h3
           id="env-status"
           className="text-lg font-semibold mb-4 pb-2 border-b scroll-mt-6"
@@ -183,9 +203,7 @@ export default function EmailSettingsPage() {
 
         <div className="border-b mt-8 mb-8"></div>
 
-        {/* ═══════════════════════════════════════════
-            SECTION IA (GROQ)
-            ═══════════════════════════════════════════ */}
+        {/* SECTION IA (GROQ) */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           🤖 Configuration IA (Groq)
         </h3>
@@ -232,9 +250,7 @@ export default function EmailSettingsPage() {
           </a>
         </div>
 
-        {/* ═══════════════════════════════════════════
-            SECTION EMAIL (RESEND)
-            ═══════════════════════════════════════════ */}
+        {/* SECTION EMAIL (RESEND) */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b">
           📧 Configuration Email (Resend)
         </h3>
@@ -252,7 +268,6 @@ export default function EmailSettingsPage() {
         </p>
 
         <div className="space-y-4">
-          {/* Champ Domaine Personnalisé */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Domaine d'envoi personnalisé
@@ -278,7 +293,6 @@ export default function EmailSettingsPage() {
             </div>
           </div>
 
-          {/* Instructions dynamiques */}
           {settings.custom_domain && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="font-bold text-blue-800 mb-2">
@@ -302,38 +316,24 @@ export default function EmailSettingsPage() {
                 </li>
                 <li>
                   Saisissez <strong>{settings.custom_domain}</strong>{" "}
-                  (recommandé : utilisez un sous-domaine comme{" "}
-                  <code>notifications.{settings.custom_domain}</code> pour
-                  protéger votre réputation d'envoi).
+                  (recommandé : sous-domaine comme{" "}
+                  <code>notifications.{settings.custom_domain}</code>).
                 </li>
                 <li>
                   Resend va générer des enregistrements <strong>DNS</strong>{" "}
-                  (TXT, MX, CNAME). Copiez-les exactement dans votre
-                  fournisseur DNS (Cloudflare, OVH, etc.).
+                  (TXT, MX, CNAME). Copiez-les dans votre DNS.
                 </li>
                 <li>
-                  Revenez sur Resend et cliquez sur{" "}
-                  <strong>Verify DNS Records</strong>. La vérification prend
-                  souvent moins de 15 minutes.
+                  Cliquez sur <strong>Verify DNS Records</strong>.
                 </li>
                 <li>
-                  Une fois le statut <strong>Verified</strong> affiché,
-                  copiez votre <strong>API Key</strong> dans{" "}
-                  <a
-                    href="https://resend.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    resend.com/api-keys
-                  </a>{" "}
-                  et collez-la ci-dessous.
+                  Une fois <strong>Verified</strong>, copiez votre{" "}
+                  <strong>API Key</strong> et collez-la ci-dessous.
                 </li>
               </ol>
             </div>
           )}
 
-          {/* Adresse email d'envoi */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Adresse email d'envoi (from)
@@ -363,7 +363,6 @@ export default function EmailSettingsPage() {
             )}
           </div>
 
-          {/* Nom de l'expéditeur */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Nom de l'expéditeur
@@ -379,7 +378,6 @@ export default function EmailSettingsPage() {
             />
           </div>
 
-          {/* Email de réception */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Email de réception (to)
@@ -395,7 +393,6 @@ export default function EmailSettingsPage() {
             />
           </div>
 
-          {/* Clé API Resend */}
           <div>
             <label className="block text-sm font-semibold mb-1">
               Clé API Resend
@@ -419,12 +416,10 @@ export default function EmailSettingsPage() {
             📥 Réception d'emails (Webhook Resend)
           </h3>
           <p className="text-sm text-gray-500 mb-6">
-            Configurez la réception automatique des factures par email. Les
-            documents reçus seront traités automatiquement par l'IA.
+            Configurez la réception automatique des factures par email.
           </p>
 
           <div className="space-y-4">
-            {/* Domaine inbound */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 Domaine de réception (Inbound)
@@ -441,13 +436,8 @@ export default function EmailSettingsPage() {
                 placeholder="inbound.monentreprise.com"
                 className="w-full border rounded px-3 py-2"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                L'adresse email à laquelle vos clients enverront leurs
-                factures.
-              </p>
             </div>
 
-            {/* Secret webhook */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 Secret du Webhook (whsec_...)
@@ -466,7 +456,6 @@ export default function EmailSettingsPage() {
               />
             </div>
 
-            {/* URL à copier dans Resend */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 URL du Webhook (à coller dans Resend)
@@ -499,7 +488,6 @@ export default function EmailSettingsPage() {
               </div>
             </div>
 
-            {/* Instructions */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="font-bold text-blue-800 mb-2">
                 📋 Comment configurer le webhook sur Resend
@@ -520,34 +508,29 @@ export default function EmailSettingsPage() {
                   Cliquez sur <strong>Add Webhook</strong>.
                 </li>
                 <li>
-                  Collez l'URL ci-dessus dans le champ{" "}
-                  <strong>Endpoint URL</strong>.
+                  Collez l'URL ci-dessus dans <strong>Endpoint URL</strong>.
                 </li>
                 <li>
-                  Sélectionnez l'événement <strong>email.received</strong>.
+                  Sélectionnez <strong>email.received</strong>.
                 </li>
                 <li>
-                  Copiez le <strong>Signing Secret</strong> (whsec_...) et
-                  collez-le dans le champ "Secret du Webhook" ci-dessus.
+                  Copiez le <strong>Signing Secret</strong> (whsec_...).
                 </li>
                 <li>
-                  Cliquez sur <strong>Save</strong>, puis sur{" "}
-                  <strong>💾 Sauvegarder</strong> ici.
+                  Cliquez sur <strong>Save</strong>.
                 </li>
               </ol>
             </div>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════
-            SECTION RELANCES AUTOMATIQUES
-            ═══════════════════════════════════════════ */}
+        {/* SECTION RELANCES AUTOMATIQUES */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
           📧 Relances automatiques
         </h3>
         <p className="text-sm text-gray-500 mb-6">
           Relance automatiquement les documents bloqués en exception depuis
-          plusieurs jours. Utile pour ne rien oublier.
+          plusieurs jours.
         </p>
 
         <div className="space-y-4">
@@ -591,9 +574,6 @@ export default function EmailSettingsPage() {
                     );
                   })}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Vercel utilise UTC. Tunis = UTC+1 (hiver) ou UTC+2 (été).
-                </p>
               </div>
 
               <div>
@@ -634,9 +614,7 @@ export default function EmailSettingsPage() {
           )}
         </div>
 
-        {/* ═══════════════════════════════════════════
-            SECTION CRON
-            ═══════════════════════════════════════════ */}
+        {/* SECTION CRON */}
         <h3 className="text-lg font-semibold mb-4 pb-2 border-b mt-8">
           ⏰ Envoi automatique (Cron)
         </h3>
@@ -790,6 +768,304 @@ export default function EmailSettingsPage() {
           </a>
         </div>
       </Card>
+
+      {/* ⭐ MODAL DE CONFIGURATION DES ENTREPRISES */}
+      {showConfigModal && (
+        <CompanyConfigModal
+          companies={companies}
+          onClose={() => setShowConfigModal(false)}
+          onSave={async () => {
+            // Recharger les entreprises
+            const res = await fetch("/api/companies");
+            const data = await res.json();
+            setCompanies(data.companies ?? []);
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODAL DE CONFIGURATION DES ENTREPRISES
+// ═══════════════════════════════════════════════════════════════
+
+function CompanyConfigModal({
+  companies,
+  onClose,
+  onSave,
+}: {
+  companies: Company[];
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const [edits, setEdits] = useState<Record<string, Company>>(() => {
+    const initial: Record<string, Company> = {};
+    for (const c of companies) {
+      initial[c.id] = { ...c };
+    }
+    return initial;
+  });
+  const [saving, setSaving] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function handleSaveOne(companyId: string) {
+    setSaving(companyId);
+    setMessage(null);
+
+    try {
+      const company = edits[companyId];
+      const res = await fetch(`/api/companies/${companyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: company.name,
+          tax_id: company.tax_id,
+          email: company.email,
+          phone: company.phone,
+          address: company.address,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage(`✅ ${company.name} sauvegardée`);
+        setTimeout(() => setMessage(null), 3000);
+        onSave();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } catch (err) {
+      setMessage(`❌ ${err instanceof Error ? err.message : "Erreur"}`);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleSaveAll() {
+    setSaving("all");
+    setMessage(null);
+
+    try {
+      let success = 0;
+      let failed = 0;
+
+      for (const company of companies) {
+        const edit = edits[company.id];
+        try {
+          const res = await fetch(`/api/companies/${company.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: edit.name,
+              tax_id: edit.tax_id,
+              email: edit.email,
+              phone: edit.phone,
+              address: edit.address,
+            }),
+          });
+          if (res.ok) success++;
+          else failed++;
+        } catch {
+          failed++;
+        }
+      }
+
+      setMessage(
+        `✅ ${success} entreprise(s) sauvegardée(s)` +
+          (failed > 0 ? ` — ❌ ${failed} échec(s)` : "")
+      );
+      setTimeout(() => setMessage(null), 5000);
+      onSave();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold">
+              ⚙️ Configuration des entreprises
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Modifiez les 3 paramètres du score : nom, MF, email
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl"
+          >
+            ✖
+          </button>
+        </div>
+
+        {/* Message */}
+        {message && (
+          <div className="mx-6 mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+            {message}
+          </div>
+        )}
+
+        {/* Companies */}
+        <div className="p-6 space-y-6">
+          {companies.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-3xl mb-2">🏢</p>
+              <p>Aucune entreprise à configurer</p>
+              <Link
+                href="/dashboard/companies"
+                className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+              >
+                ➕ Créer une entreprise
+              </Link>
+            </div>
+          ) : (
+            companies.map((c) => {
+              const edit = edits[c.id];
+              return (
+                <div
+                  key={c.id}
+                  className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg">
+                      🏢 {c.name || "Sans nom"}
+                    </h3>
+                    <button
+                      onClick={() => handleSaveOne(c.id)}
+                      disabled={saving === c.id}
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs disabled:opacity-50"
+                    >
+                      {saving === c.id ? "⏳" : "💾 Sauvegarder"}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-gray-600">
+                        🏷️ Nom de l'entreprise (critère 1)
+                      </label>
+                      <input
+                        type="text"
+                        value={edit.name}
+                        onChange={(e) =>
+                          setEdits({
+                            ...edits,
+                            [c.id]: { ...edit, name: e.target.value },
+                          })
+                        }
+                        placeholder="ex: elec-connect1"
+                        className="w-full border rounded px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-gray-600">
+                        🆔 Matricule fiscal (critère 2)
+                      </label>
+                      <input
+                        type="text"
+                        value={edit.tax_id || ""}
+                        onChange={(e) =>
+                          setEdits({
+                            ...edits,
+                            [c.id]: { ...edit, tax_id: e.target.value },
+                          })
+                        }
+                        placeholder="ex: MF-123456789"
+                        className="w-full border rounded px-3 py-2 text-sm font-mono bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-gray-600">
+                        📧 Email (critère 3)
+                      </label>
+                      <input
+                        type="email"
+                        value={edit.email || ""}
+                        onChange={(e) =>
+                          setEdits({
+                            ...edits,
+                            [c.id]: { ...edit, email: e.target.value },
+                          })
+                        }
+                        placeholder="ex: contact@monentreprise.com"
+                        className="w-full border rounded px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-gray-600">
+                        📞 Téléphone
+                      </label>
+                      <input
+                        type="tel"
+                        value={edit.phone || ""}
+                        onChange={(e) =>
+                          setEdits({
+                            ...edits,
+                            [c.id]: { ...edit, phone: e.target.value },
+                          })
+                        }
+                        placeholder="ex: 29328870"
+                        className="w-full border rounded px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold mb-1 text-gray-600">
+                        📍 Adresse
+                      </label>
+                      <input
+                        type="text"
+                        value={edit.address || ""}
+                        onChange={(e) =>
+                          setEdits({
+                            ...edits,
+                            [c.id]: { ...edit, address: e.target.value },
+                          })
+                        }
+                        placeholder="ex: 01, Rue Manfalouti Jemmel"
+                        className="w-full border rounded px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3 italic">
+                    💡 Plus vous remplissez de critères, plus le score sera
+                    élevé (1/3, 2/3 ou 3/3)
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        {companies.length > 0 && (
+          <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-between gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Fermer
+            </button>
+            <button
+              onClick={handleSaveAll}
+              disabled={saving !== null}
+              className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-semibold"
+            >
+              {saving === "all" ? "⏳ Sauvegarde…" : "💾 Tout sauvegarder"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
