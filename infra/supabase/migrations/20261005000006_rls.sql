@@ -29,7 +29,7 @@ CREATE POLICY "auth_update_documents"
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
         AND profiles.is_active = true
-        AND profiles.role IN ('admin', 'accountant')
+        AND profiles.role IN ('admin', 'accountant', 'super_admin')
     )
   );
 
@@ -42,7 +42,7 @@ CREATE POLICY "auth_delete_documents"
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
         AND profiles.is_active = true
-        AND profiles.role IN ('admin', 'accountant')
+        AND profiles.role IN ('admin', 'accountant', 'super_admin')
     )
   );
 
@@ -115,7 +115,7 @@ CREATE POLICY "audit_log_select_admin"
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
         AND profiles.is_active = true
-        AND profiles.role = 'admin'
+        AND profiles.role IN ('admin', 'super_admin')
     )
   );
 
@@ -146,7 +146,7 @@ CREATE POLICY "auth_write_settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
         AND profiles.is_active = true
-        AND profiles.role IN ('admin', 'accountant')
+        AND profiles.role IN ('admin', 'accountant', 'super_admin')
     )
   );
 
@@ -166,7 +166,8 @@ DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own"
   ON public.profiles FOR UPDATE
   TO authenticated
-  USING (auth.uid() = id);
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 DROP POLICY IF EXISTS "profiles_admin_all" ON public.profiles;
 CREATE POLICY "profiles_admin_all"
@@ -177,6 +178,6 @@ CREATE POLICY "profiles_admin_all"
       SELECT 1 FROM public.profiles p
       WHERE p.id = auth.uid()
         AND p.is_active = true
-        AND p.role = 'admin'
+        AND p.role IN ('admin', 'super_admin')
     )
   );

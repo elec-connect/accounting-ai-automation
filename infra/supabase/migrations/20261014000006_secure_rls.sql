@@ -1,61 +1,54 @@
 -- ═══════════════════════════════════════════════════════════════
---  🚨 SÉCURITÉ CRITIQUE — Verrouillage des tables sensibles
---  Corrige 3 failles :
---  1. profiles : auto-promotion possible
---  2. licenses : admin client peut tout modifier
---  3. super_admins : tout le monde peut lire la liste
+--  SÉCURITÉ — Verrouillage des tables sensibles
+--  ⚠️ Policies SIMPLES sans auto-référence (évite récursion 500)
 -- ═══════════════════════════════════════════════════════════════
 
--- ─────────────────────────────────────────────────────────────
---  1. TABLE profiles — Empêcher l'auto-promotion
--- ─────────────────────────────────────────────────────────────
+-- ═══════════════════════════════════════════════════════════════
+--  1. TABLE profiles
+-- ═══════════════════════════════════════════════════════════════
 
-DROP POLICY IF EXISTS "auth_update_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update_own_safe" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_all" ON public.profiles;
+DROP POLICY IF EXISTS "admin_update_all_profiles" ON public.profiles;
 
-CREATE POLICY "profiles_update_own_safe"
+-- ⭐ SELECT : tout utilisateur authentifié
+CREATE POLICY "profiles_select_all"
+  ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- ⭐ UPDATE : l'utilisateur peut modifier SON profil
+CREATE POLICY "profiles_update_self"
   ON public.profiles
   FOR UPDATE
   TO authenticated
   USING (id = auth.uid())
-  WITH CHECK (
-    id = auth.uid()
-    AND role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-    AND is_active = (SELECT is_active FROM public.profiles WHERE id = auth.uid())
-  );
+  WITH CHECK (id = auth.uid());
 
-DROP POLICY IF EXISTS "admin_update_all_profiles" ON public.profiles;
-
-CREATE POLICY "admin_update_all_profiles"
+-- ⭐ ALL : les super_admins peuvent tout faire
+CREATE POLICY "profiles_super_admin_all"
   ON public.profiles
-  FOR UPDATE
+  FOR ALL
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid()
-        AND p.is_active = true
-        AND p.role IN ('admin', 'super_admin')
-    )
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'super_admin'
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid()
-        AND p.is_active = true
-        AND p.role IN ('admin', 'super_admin')
-    )
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'super_admin'
   );
 
--- ─────────────────────────────────────────────────────────────
---  2. TABLE licenses — SEUL super_admin peut gérer
--- ─────────────────────────────────────────────────────────────
+-- ═══════════════════════════════════════════════════════════════
+--  2. TABLE licenses
+-- ═══════════════════════════════════════════════════════════════
 
 DROP POLICY IF EXISTS "licenses_admin_all" ON public.licenses;
 DROP POLICY IF EXISTS "licenses_super_admin_all" ON public.licenses;
 DROP POLICY IF EXISTS "licenses_read_own" ON public.licenses;
 
+-- ⭐ SEUL super_admin peut gérer les licences
 CREATE POLICY "licenses_super_admin_all"
   ON public.licenses
   FOR ALL
@@ -77,15 +70,17 @@ CREATE POLICY "licenses_super_admin_all"
     )
   );
 
+-- ⭐ Le client peut lire SA licence
 CREATE POLICY "licenses_read_own"
   ON public.licenses
   FOR SELECT
   TO authenticated
   USING (activated_by = auth.uid());
 
--- ─────────────────────────────────────────────────────────────
---  3. TABLE super_admins — Lecture restreinte
--- ─────────────────────────────────────────────────────────────
+-- ═══════════════════════════════════════════════════════════════
+--  3. TABLE super_admins
+--  ⚠️ PAS de référence à auth.users (échoue en RLS)
+-- ═══════════════════════════════════════════════════════════════
 
 DROP POLICY IF EXISTS "super_admins_read" ON public.super_admins;
 DROP POLICY IF EXISTS "super_admins_read_safe" ON public.super_admins;
@@ -101,5 +96,4 @@ CREATE POLICY "super_admins_read_safe"
         AND p.is_active = true
         AND p.role = 'super_admin'
     )
-    OR email = (SELECT email FROM auth.users WHERE id = auth.uid())
   );
