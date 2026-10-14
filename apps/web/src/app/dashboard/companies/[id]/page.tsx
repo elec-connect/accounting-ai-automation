@@ -718,7 +718,7 @@ export default function CompanyDetailPage() {
                 }`}
               >
                 {/* Fichier + détails */}
-                <td className="p-3 align-top" style={{ minWidth: "320px" }}>
+                <td className="px-4 py-5 align-top" style={{ minWidth: "380px" }}>
                   <div className="flex items-start gap-2">
                     {isDuplicateSuspect && (
                       <span className="text-red-600 text-xl shrink-0">
@@ -742,12 +742,12 @@ export default function CompanyDetailPage() {
                       )}
 
                       {isDuplicateSuspect && d.duplicate_reason && (
-                        <ul className="mt-2 space-y-1">
+                        <ul className="mt-3 space-y-2">
                           {formatDuplicateReason(d.duplicate_reason).map(
                             (reason, idx) => (
                               <li
-                                key={idx}
-                                className="text-xs text-red-700 flex items-start gap-1"
+                                 key={idx}
+                                 className="text-sm text-red-700 flex items-start gap-2 leading-relaxed"
                               >
                                 <span className="text-red-500 shrink-0">
                                   •
@@ -762,17 +762,17 @@ export default function CompanyDetailPage() {
                   </div>
                 </td>
 
-                <td className="p-3 align-top">
+                <td className="px-4 py-5 align-top">
                   {d.role === "issuer"
                     ? "📤 Émetteur"
                     : "📥 Destinataire"}
                 </td>
 
-                <td className="p-3 align-top">
+                <td className="px-4 py-5 align-top">
                   {d.direction === "issued" ? "Vente" : "Achat"}
                 </td>
 
-                <td className="p-3 align-top">
+                <td className="px-4 py-5 align-top">
                   <span
                     className={`text-xs px-2 py-1 rounded-full font-semibold ${
                       isDuplicateSuspect
@@ -792,7 +792,7 @@ export default function CompanyDetailPage() {
                   </span>
                 </td>
 
-                <td className="p-3 align-top" style={{ minWidth: "160px" }}>
+                <td className="px-4 py-5 align-top" style={{ minWidth: "160px" }}>
                   {isDuplicateSuspect ? (
                     <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-red-200 text-red-900 border-2 border-red-400 whitespace-nowrap">
                       🚩 Doublon suspect
@@ -812,7 +812,7 @@ export default function CompanyDetailPage() {
                   )}
                 </td>
 
-                <td className="p-3 align-top">
+                <td className="px-4 py-5 align-top">
                   <div className="flex gap-1">
                     {(isPending || isDuplicateSuspect) && !isRejected && (
                       <>
@@ -824,7 +824,7 @@ export default function CompanyDetailPage() {
                             )
                           }
                           disabled={processing === d.id}
-                          className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          className="text-sm px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
                           title="Accepter"
                         >
                           {processing === d.id ? "⏳" : "✅"}
@@ -837,7 +837,7 @@ export default function CompanyDetailPage() {
                             )
                           }
                           disabled={processing === d.id}
-                          className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                          className="text-sm px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                           title="Refuser"
                         >
                           {processing === d.id ? "⏳" : "❌"}
