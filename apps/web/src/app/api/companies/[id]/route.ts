@@ -35,6 +35,7 @@ export async function GET(
       .eq('company_id', id)
       .order('entry_date', { ascending: false });
 
+    // ⭐⭐⭐ AJOUT : duplicate_suspect et duplicate_reason
     const { data: documents } = await supabase
       .from('document_companies')
       .select(`
@@ -44,6 +45,8 @@ export async function GET(
         match_score,
         confidence,
         needs_review,
+        duplicate_suspect,
+        duplicate_reason,
         documents (
           id,
           original_filename,
@@ -81,33 +84,33 @@ export async function GET(
 
     // Partenaires
     const partyMap = new Map<
-  string,
-  { type: string; debit: number; credit: number }
->();
+      string,
+      { type: string; debit: number; credit: number }
+    >();
 
-for (const e of entries ?? []) {
-  if (!e.party_name) continue;
+    for (const e of entries ?? []) {
+      if (!e.party_name) continue;
 
-  const account = String(e.account_number || '').trim();
-  const debit = Number(e.debit) || 0;
-  const credit = Number(e.credit) || 0;
+      const account = String(e.account_number || '').trim();
+      const debit = Number(e.debit) || 0;
+      const credit = Number(e.credit) || 0;
 
-  // ⭐ Pour un CLIENT : on ne compte QUE le compte 411
-  // ⭐ Pour un FOURNISSEUR : on ne compte QUE le compte 401
-  const isClientAccount = account === '411';
-  const isSupplierAccount = account === '401';
+      // ⭐ Pour un CLIENT : on ne compte QUE le compte 411
+      // ⭐ Pour un FOURNISSEUR : on ne compte QUE le compte 401
+      const isClientAccount = account === '411';
+      const isSupplierAccount = account === '401';
 
-  if (!isClientAccount && !isSupplierAccount) continue;
+      if (!isClientAccount && !isSupplierAccount) continue;
 
-  const existing = partyMap.get(e.party_name) ?? {
-    type: e.party_type,
-    debit: 0,
-    credit: 0,
-  };
-  existing.debit += debit;
-  existing.credit += credit;
-  partyMap.set(e.party_name, existing);
-}
+      const existing = partyMap.get(e.party_name) ?? {
+        type: e.party_type,
+        debit: 0,
+        credit: 0,
+      };
+      existing.debit += debit;
+      existing.credit += credit;
+      partyMap.set(e.party_name, existing);
+    }
 
     const parties = Array.from(partyMap.entries())
       .map(([party_name, data]) => ({

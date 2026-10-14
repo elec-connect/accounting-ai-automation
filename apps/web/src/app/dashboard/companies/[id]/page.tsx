@@ -41,6 +41,8 @@ type DocLink = {
   match_score: number | null;
   confidence: string | null;
   needs_review: boolean;
+  duplicate_suspect?: boolean;
+  duplicate_reason?: string | null;
   documents: {
     id: string;
     original_filename: string;
@@ -98,6 +100,9 @@ export default function CompanyDetailPage() {
               : "") +
             (data.stats.documents_rejected > 0
               ? ` — ❌ ${data.stats.documents_rejected} refusés`
+              : "") +
+            (data.stats.documents_duplicate_suspects > 0
+              ? ` — 🚩 ${data.stats.documents_duplicate_suspects} doublons suspects`
               : "")
         );
         await loadData();
@@ -161,31 +166,31 @@ export default function CompanyDetailPage() {
   }
 
   // ⭐ Récupérer un document refusé
-async function handleRecover(linkId: string, filename: string) {
-  if (
-    !confirm(
-      `🔄 Récupérer ${filename} ?\n\nCe document repassera en "À vérifier" et devra être accepté ou refusé à nouveau.`
+  async function handleRecover(linkId: string, filename: string) {
+    if (
+      !confirm(
+        `🔄 Récupérer ${filename} ?\n\nCe document repassera en "À vérifier" et devra être accepté ou refusé à nouveau.`
+      )
     )
-  )
-    return;
+      return;
 
-  setProcessing(linkId);
-  try {
-    const res = await fetch(`/api/document-companies/${linkId}/recover`, {
-      method: "POST",
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setMessage(`🔄 ${filename} récupéré`);
-      await loadData();
-      await handleRecalculate();
-    } else {
-      setMessage(`❌ ${data.error}`);
+    setProcessing(linkId);
+    try {
+      const res = await fetch(`/api/document-companies/${linkId}/recover`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`🔄 ${filename} récupéré`);
+        await loadData();
+        await handleRecalculate();
+      } else {
+        setMessage(`❌ ${data.error}`);
+      }
+    } finally {
+      setProcessing(null);
     }
-  } finally {
-    setProcessing(null);
   }
-}
 
   // ⭐ Accepter tout
   async function handleAcceptAll() {
@@ -260,85 +265,86 @@ async function handleRecover(linkId: string, filename: string) {
       setRejectingAll(false);
     }
   }
+
   // ⭐ Export Excel
-async function handleExportExcel() {
-  setExporting('excel');
-  setMessage(null);
+  async function handleExportExcel() {
+    setExporting('excel');
+    setMessage(null);
 
-  try {
-    const res = await fetch(`/api/companies/${id}/export/excel`);
+    try {
+      const res = await fetch(`/api/companies/${id}/export/excel`);
 
-    if (!res.ok) {
-      const error = await res.json();
-      setMessage(`❌ ${error.error}`);
-      return;
+      if (!res.ok) {
+        const error = await res.json();
+        setMessage(`❌ ${error.error}`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      const contentDisposition = res.headers.get('content-disposition');
+      let filename = `bilan_${company?.name ?? 'company'}.xlsx`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+?)"/);
+        if (match) filename = match[1];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setMessage(`✅ Fichier Excel téléchargé`);
+    } catch (err) {
+      setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
+    } finally {
+      setExporting(null);
     }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-
-    const contentDisposition = res.headers.get('content-disposition');
-    let filename = `bilan_${company?.name ?? 'company'}.xlsx`;
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="(.+?)"/);
-      if (match) filename = match[1];
-    }
-
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    setMessage(`✅ Fichier Excel téléchargé`);
-  } catch (err) {
-    setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
-  } finally {
-    setExporting(null);
   }
-}
 
-// ⭐ Export PDF
-async function handleExportPDF() {
-  setExporting('pdf');
-  setMessage(null);
+  // ⭐ Export PDF
+  async function handleExportPDF() {
+    setExporting('pdf');
+    setMessage(null);
 
-  try {
-    const res = await fetch(`/api/companies/${id}/export/pdf`);
+    try {
+      const res = await fetch(`/api/companies/${id}/export/pdf`);
 
-    if (!res.ok) {
-      const error = await res.json();
-      setMessage(`❌ ${error.error}`);
-      return;
+      if (!res.ok) {
+        const error = await res.json();
+        setMessage(`❌ ${error.error}`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      const contentDisposition = res.headers.get('content-disposition');
+      let filename = `bilan_${company?.name ?? 'company'}.pdf`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+?)"/);
+        if (match) filename = match[1];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setMessage(`✅ Fichier PDF téléchargé`);
+    } catch (err) {
+      setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
+    } finally {
+      setExporting(null);
     }
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-
-    const contentDisposition = res.headers.get('content-disposition');
-    let filename = `bilan_${company?.name ?? 'company'}.pdf`;
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="(.+?)"/);
-      if (match) filename = match[1];
-    }
-
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    setMessage(`✅ Fichier PDF téléchargé`);
-  } catch (err) {
-    setMessage(`❌ Erreur : ${err instanceof Error ? err.message : 'inconnue'}`);
-  } finally {
-    setExporting(null);
   }
-}
 
   useEffect(() => {
     if (!id) return;
@@ -371,6 +377,10 @@ async function handleExportPDF() {
   const needsReviewCount = needsReviewDocs.length;
   const rejectedCount = rejectedDocs.length;
 
+  // ⭐ Doublons suspects
+  const duplicateDocs = documents.filter((d) => d.duplicate_suspect === true);
+  const duplicateCount = duplicateDocs.length;
+
   return (
     <main className="p-8 max-w-6xl">
       <Link
@@ -381,70 +391,89 @@ async function handleExportPDF() {
       </Link>
 
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-  <div>
-    <h1 className="text-3xl font-bold mb-2">🏢 {company.name}</h1>
-    <div className="flex items-center gap-3 text-sm text-gray-500">
-      {company.tax_id && (
-        <span className="font-mono">MF: {company.tax_id}</span>
-      )}
-      {company.email && <span>{company.email}</span>}
-    </div>
-  </div>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">🏢 {company.name}</h1>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            {company.tax_id && (
+              <span className="font-mono">MF: {company.tax_id}</span>
+            )}
+            {company.email && <span>{company.email}</span>}
+          </div>
+        </div>
 
-  <div className="flex gap-2 flex-wrap">
-    <button
-      onClick={handleExportExcel}
-      disabled={exporting !== null || balance.length === 0}
-      className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-      title="Télécharger la balance en Excel"
-    >
-      {exporting === 'excel' ? (
-        <>
-          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          Export…
-        </>
-      ) : (
-        <>📥 Excel</>
-      )}
-    </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting !== null || balance.length === 0}
+            className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            title="Télécharger la balance en Excel"
+          >
+            {exporting === 'excel' ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Export…
+              </>
+            ) : (
+              <>📥 Excel</>
+            )}
+          </button>
 
-    <button
-      onClick={handleExportPDF}
-      disabled={exporting !== null || balance.length === 0}
-      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-      title="Télécharger la balance en PDF"
-    >
-      {exporting === 'pdf' ? (
-        <>
-          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          Export…
-        </>
-      ) : (
-        <>📄 PDF</>
-      )}
-    </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting !== null || balance.length === 0}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            title="Télécharger la balance en PDF"
+          >
+            {exporting === 'pdf' ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Export…
+              </>
+            ) : (
+              <>📄 PDF</>
+            )}
+          </button>
 
-    <button
-      onClick={handleRecalculate}
-      disabled={calculating || exporting !== null}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-    >
-      {calculating ? (
-        <>
-          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          Calcul en cours…
-        </>
-      ) : (
-        <>🔄 Recalculer</>
-      )}
-    </button>
-  </div>
-</div>
+          <button
+            onClick={handleRecalculate}
+            disabled={calculating || exporting !== null}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+          >
+            {calculating ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Calcul en cours…
+              </>
+            ) : (
+              <>🔄 Recalculer</>
+            )}
+          </button>
+        </div>
+      </div>
 
       {message && (
         <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
           {message}
         </div>
+      )}
+
+      {/* ⭐ NOUVEAU : Bandeau doublons suspects */}
+      {duplicateCount > 0 && (
+        <Card className="p-4 mb-6 bg-red-50 border-2 border-red-300">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚩</span>
+            <div>
+              <p className="font-semibold text-red-900">
+                {duplicateCount} doublon{duplicateCount > 1 ? "s" : ""} suspect
+                {duplicateCount > 1 ? "s" : ""} détecté{duplicateCount > 1 ? "s" : ""}
+              </p>
+              <p className="text-sm text-red-700">
+                Ces documents sont <strong>exclus du calcul</strong> tant que vous
+                ne les acceptez ou refusez pas.
+              </p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Bandeau documents à vérifier */}
@@ -657,24 +686,48 @@ async function handleExportPDF() {
               {documents.map((d) => {
                 const isRejected = d.confidence === "rejected";
                 const isPending = d.needs_review && !isRejected;
+                const isDuplicateSuspect = d.duplicate_suspect === true;
 
                 return (
                   <tr
                     key={d.id}
-                    className={`border-b hover:bg-gray-50 ${
-                      isRejected ? "opacity-60" : ""
+                    className={`border-b transition-colors ${
+                      isDuplicateSuspect
+                        ? "bg-red-100 border-l-4 border-l-red-500 hover:bg-red-200"
+                        : isRejected
+                        ? "opacity-60 hover:bg-gray-50"
+                        : "hover:bg-gray-50"
                     }`}
                   >
                     <td className="p-2">
-                      {d.documents ? (
-                        <Link
-                          href={`/dashboard/documents/${d.documents.id}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {d.documents.original_filename}
-                        </Link>
-                      ) : (
-                        "—"
+                      <div className="flex items-center gap-2">
+                        {isDuplicateSuspect && (
+                          <span
+                            className="text-red-600 text-lg"
+                            title={d.duplicate_reason || "Doublon suspect"}
+                          >
+                            🚩
+                          </span>
+                        )}
+                        {d.documents ? (
+                          <Link
+                            href={`/dashboard/documents/${d.documents.id}`}
+                            className={`hover:underline ${
+                              isDuplicateSuspect
+                                ? "text-red-700 font-semibold"
+                                : "text-blue-600"
+                            }`}
+                          >
+                            {d.documents.original_filename}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
+                      {isDuplicateSuspect && d.duplicate_reason && (
+                        <p className="text-xs text-red-600 mt-1 italic">
+                          {d.duplicate_reason}
+                        </p>
                       )}
                     </td>
                     <td className="p-2">
@@ -686,7 +739,9 @@ async function handleExportPDF() {
                     <td className="p-2">
                       <span
                         className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                          isRejected
+                          isDuplicateSuspect
+                            ? "bg-red-200 text-red-900"
+                            : isRejected
                             ? "bg-red-100 text-red-800"
                             : d.confidence === "high"
                             ? "bg-green-100 text-green-800"
@@ -701,7 +756,11 @@ async function handleExportPDF() {
                       </span>
                     </td>
                     <td className="p-2">
-                      {isRejected ? (
+                      {isDuplicateSuspect ? (
+                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-200 text-red-900 border border-red-400">
+                          🚩 Doublon suspect
+                        </span>
+                      ) : isRejected ? (
                         <span className="text-xs text-red-700 font-semibold">
                           ❌ Refusé
                         </span>
@@ -714,57 +773,57 @@ async function handleExportPDF() {
                       )}
                     </td>
                     <td className="p-2">
-  <div className="flex gap-1">
-    {/* En attente : Accepter + Refuser */}
-    {isPending && (
-      <>
-        <button
-          onClick={() =>
-            handleAccept(
-              d.id,
-              d.documents?.original_filename ?? ""
-            )
-          }
-          disabled={processing === d.id}
-          className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-          title="Accepter"
-        >
-          {processing === d.id ? "⏳" : "✅"}
-        </button>
-        <button
-          onClick={() =>
-            handleReject(
-              d.id,
-              d.documents?.original_filename ?? ""
-            )
-          }
-          disabled={processing === d.id}
-          className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-          title="Refuser"
-        >
-          {processing === d.id ? "⏳" : "❌"}
-        </button>
-      </>
-    )}
+                      <div className="flex gap-1">
+                        {/* En attente ou Doublon suspect : Accepter + Refuser */}
+                        {(isPending || isDuplicateSuspect) && !isRejected && (
+                          <>
+                            <button
+                              onClick={() =>
+                                handleAccept(
+                                  d.id,
+                                  d.documents?.original_filename ?? ""
+                                )
+                              }
+                              disabled={processing === d.id}
+                              className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                              title="Accepter"
+                            >
+                              {processing === d.id ? "⏳" : "✅"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleReject(
+                                  d.id,
+                                  d.documents?.original_filename ?? ""
+                                )
+                              }
+                              disabled={processing === d.id}
+                              className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                              title="Refuser"
+                            >
+                              {processing === d.id ? "⏳" : "❌"}
+                            </button>
+                          </>
+                        )}
 
-    {/* Refusé : Récupérer */}
-    {isRejected && (
-      <button
-        onClick={() =>
-          handleRecover(
-            d.id,
-            d.documents?.original_filename ?? ""
-          )
-        }
-        disabled={processing === d.id}
-        className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
-        title="Récupérer (remettre en attente)"
-      >
-        {processing === d.id ? "⏳" : "🔄 Récupérer"}
-      </button>
-    )}
-  </div>
-</td>
+                        {/* Refusé : Récupérer */}
+                        {isRejected && (
+                          <button
+                            onClick={() =>
+                              handleRecover(
+                                d.id,
+                                d.documents?.original_filename ?? ""
+                              )
+                            }
+                            disabled={processing === d.id}
+                            className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+                            title="Récupérer (remettre en attente)"
+                          >
+                            {processing === d.id ? "⏳" : "🔄 Récupérer"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
