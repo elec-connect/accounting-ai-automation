@@ -811,6 +811,9 @@ ${rawText.slice(0, 8000)}`,
     }
   }
 }
+    } catch (dupErr) {
+      console.error('Duplicate check failed:', dupErr);
+    }
 
     // ─────────────────────────────────────────────────────────
     //  11. Mettre à jour le document
