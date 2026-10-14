@@ -752,7 +752,10 @@ ${rawText.slice(0, 8000)}`,
     .join(', ');
 
   const reasons = dupData.matches
-    .map((m: { match_reason: string }) => m.match_reason)
+    .map(
+      (m: { match_reason?: string; original_filename: string }) =>
+        m.match_reason || `Doublon avec ${m.original_filename}`
+    )
     .join(' | ');
 
   warnings.push(`⚠️ Doublon potentiel avec : ${names}`);
@@ -768,25 +771,46 @@ ${rawText.slice(0, 8000)}`,
     .update({ warnings })
     .eq('document_id', id);
 
-  // ⭐ Marquer les liens document_companies comme doublons suspects
-  await supabase
+  // ⭐⭐⭐ MARQUER LE DOCUMENT COURANT
+  const { error: markCurrentError } = await supabase
     .from('document_companies')
     .update({
       duplicate_suspect: true,
       duplicate_reason: reasons,
-      needs_review: true, // ⭐ Force needs_review → exclu du calcul
+      needs_review: true,
     })
     .eq('document_id', id);
 
-  console.log('🚩 Liens marqués comme doublons suspects');
-}
-    } catch (dupErr) {
-      console.error('Duplicate check failed:', dupErr);
-    }
+  if (markCurrentError) {
+    console.error('❌ Erreur marquage doublon (courant):', markCurrentError);
+  } else {
+    console.log(`🚩 Document courant marqué comme doublon suspect: ${id}`);
+  }
 
-    console.log(
-      `Decision: score=${confidenceScore}, status=${newStatus}, exception=${shouldCreateException}`
-    );
+  // ⭐⭐⭐ MARQUER AUSSI LES DOCUMENTS EN DOUBLON
+  const duplicateIds = dupData.matches
+    .map((m: { id: string }) => m.id)
+    .filter(Boolean);
+
+  if (duplicateIds.length > 0) {
+    const { error: markOthersError } = await supabase
+      .from('document_companies')
+      .update({
+        duplicate_suspect: true,
+        duplicate_reason: reasons,
+        needs_review: true,
+      })
+      .in('document_id', duplicateIds);
+
+    if (markOthersError) {
+      console.error('❌ Erreur marquage doublons (autres):', markOthersError);
+    } else {
+      console.log(
+        `🚩 ${duplicateIds.length} autre(s) document(s) marqué(s) comme doublon suspect`
+      );
+    }
+  }
+}
 
     // ─────────────────────────────────────────────────────────
     //  11. Mettre à jour le document
