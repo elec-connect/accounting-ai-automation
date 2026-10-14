@@ -1,3 +1,5 @@
+// apps/web/src/app/api/companies/[id]/accept-all/route.ts
+
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -55,12 +57,14 @@ export async function POST(
       });
     }
 
-    // Update en masse
+    // ⭐ Update en masse — AJOUT : duplicate_suspect = false
     const { error } = await admin
       .from('document_companies')
       .update({
         needs_review: false,
         confidence: 'high',
+        duplicate_suspect: false,      // ⭐ NOUVEAU
+        duplicate_reason: null,        // ⭐ NOUVEAU
         match_details: {
           accepted_by: user.email,
           accepted_at: new Date().toISOString(),

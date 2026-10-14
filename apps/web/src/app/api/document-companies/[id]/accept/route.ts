@@ -1,3 +1,5 @@
+// apps/web/src/app/api/document-companies/[id]/accept/route.ts
+
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -44,6 +46,8 @@ export async function POST(
       .update({
         needs_review: false,
         confidence: 'high',
+        duplicate_suspect: false,      // ⭐ NOUVEAU
+        duplicate_reason: null,        // ⭐ NOUVEAU
         match_details: {
           accepted_by: user.email,
           accepted_at: new Date().toISOString(),

@@ -1,3 +1,5 @@
+// apps/web/src/app/api/document-companies/[id]/recover/route.ts
+
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -65,6 +67,8 @@ export async function POST(
       .update({
         needs_review: true,
         confidence: restoredConfidence,
+        duplicate_suspect: false,      // ⭐ NOUVEAU : réinitialiser
+        duplicate_reason: null,        // ⭐ NOUVEAU
         match_details: {
           ...(current.match_details || {}),
           recovered_by: user.email,
