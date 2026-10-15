@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
 #  INSTALLATION ACCOUNTING AI - SCRIPT CLIENT
 #  Execute AUTOMATIQUEMENT par l'installeur apres la copie
-#  Version : 3.1 (verification next bin + docker compose + migrations)
+#  Version : 3.2 (verification next bin + docker compose + migrations + reboot)
 # ═══════════════════════════════════════════════════════════════
 
 $ErrorActionPreference = "Continue"
@@ -176,6 +176,17 @@ if (-not $dockerProcess) {
     Write-Host "  Attente du demarrage de Docker..." -ForegroundColor Gray
 }
 
+# ⭐ Détecter si c'est un premier démarrage de Docker
+$dockerFirstRun = -not (Test-Path "$env:USERPROFILE\.docker\config.json")
+
+if ($dockerFirstRun) {
+    Write-Host "  [ATTENTION] Premier demarrage de Docker detecte" -ForegroundColor Yellow
+    Write-Host "  -> Un redemarrage Windows peut etre necessaire" -ForegroundColor Yellow
+    $needsReboot = $true
+} else {
+    $needsReboot = $false
+}
+
 $maxWait = 180
 $waited  = 0
 $dockerReady = $false
@@ -273,4 +284,29 @@ Write-Host "  2. Parametres -> Ma licence" -ForegroundColor White
 Write-Host "  3. Collez la cle recue par email" -ForegroundColor White
 Write-Host ""
 
-Read-Host "Appuyez sur Entree pour terminer"
+# ⭐ Proposer le redémarrage si premier démarrage Docker
+if ($needsReboot) {
+    Write-Host "===========================================================" -ForegroundColor Yellow
+    Write-Host "  REDEMARRAGE RECOMMANDE" -ForegroundColor Yellow
+    Write-Host "===========================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Docker a ete installe pour la premiere fois." -ForegroundColor White
+    Write-Host "Un redemarrage Windows est necessaire pour activer WSL2." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Apres le redemarrage :" -ForegroundColor Cyan
+    Write-Host "  -> Double-cliquez sur 'Accounting AI' du bureau" -ForegroundColor White
+    Write-Host ""
+    $reboot = Read-Host "Redemarrer maintenant ? (O/N)"
+
+    if ($reboot -eq "O" -or $reboot -eq "o") {
+        Write-Host "  Redemarrage dans 10 secondes..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 10
+        Restart-Computer -Force
+    } else {
+        Write-Host "  [INFO] Redemarrez Windows manuellement avant d'utiliser l'app." -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Appuyez sur Entree pour terminer"
+    }
+} else {
+    Read-Host "Appuyez sur Entree pour terminer"
+}
